@@ -1,0 +1,58 @@
+project:
+  start_date: "2024-01-01"
+  end_date: "2026-03-31"
+  timezone: "Europe/Sofia"
+
+sources:
+  sofia_boundary_url: "https://api.sofiaplan.bg/datasets/79"
+  sensor_community_archive: "https://archive.sensor.community"
+  sensor_type: "sds011"
+
+paths:
+  # Download the FILTER BGR directory and Sensor_Location.csv separately, then set
+  # these two paths (or copy them to these defaults).
+  sensor_locations: "data/raw/filter/Sensor_Location.csv"
+  bgr_directory: "data/raw/filter/BGR"
+  boundary: "data/raw/boundaries/sofia_municipality.geojson"
+  manifest: "data/interim/sofia_sensor_manifest.csv"
+  archive: "data/raw/sensor_community"
+  hourly: "data/interim/pm25_hourly_qc.csv"
+  completeness_year: "data/processed/completeness_sensor_year.csv"
+  completeness_season: "data/processed/completeness_sensor_season.csv"
+  panel: "data/processed/stable_panel.csv"
+  daily: "data/processed/pm25_daily.csv"
+
+manifest:
+  # A historical pair is a plausible 2024+ continuation if it was still seen
+  # during the final quarter of the FILTER record. This is a download prefilter,
+  # not the final analytical panel decision.
+  continuing_after: "2023-10-01"
+  historical_qc_prefix: "1233"
+  require_spread: 3
+
+download:
+  workers: 8
+  retries: 2
+  timeout_seconds: 45
+
+qc:
+  pm25_min: 0.0
+  pm25_max: 1000.0
+  minimum_twenty_minute_bins: 3
+  temporal_window_hours: 360
+  temporal_min_periods: 72
+  temporal_mad_multiplier: 8.0
+  temporal_absolute_floor: 75.0
+
+aggregation:
+  minimum_valid_hours_per_day: 18
+
+completeness:
+  minimum_valid_hours_per_day: 18
+  panel_minimum_hour_fraction: 0.60
+  panel_periods:
+    pre_2024_jan_mar: ["2024-01-01", "2024-03-31"]
+    pre_2024_oct_dec: ["2024-10-01", "2024-12-31"]
+    post_2025_jan_mar: ["2025-01-01", "2025-03-31"]
+    post_2025_oct_dec: ["2025-10-01", "2025-12-31"]
+    post_2026_jan_mar: ["2026-01-01", "2026-03-31"]

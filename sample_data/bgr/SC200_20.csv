@@ -1,0 +1,2 @@
+hour_timestamp,sensor_id,location,raw_pm2_5,spread,raw_qc,corrected_pm2_5,corrected_ci_down,corrected_ci_up,correction_improvement,corrected_qc
+1704067200,20,SC200,40.0,3,12331,,,,,

@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this repository and the underlying data providers."
+title: "Heating the City, Clearing the Air?"
+type: software
+version: 0.1.0
+date-released: 2026-09-01
+license: MIT
+repository-code: "https://github.com/patupar/sofia-lez-counterfactual"

@@ -1,0 +1,49 @@
+project:
+  start_date: "2024-01-01"
+  end_date: "2024-01-01"
+  timezone: "Europe/Sofia"
+
+sources:
+  sofia_boundary_url: "https://api.sofiaplan.bg/datasets/79"
+  sensor_community_archive: "https://archive.sensor.community"
+  sensor_type: "sds011"
+
+paths:
+  sensor_locations: "sample_data/Sensor_Location.csv"
+  bgr_directory: "sample_data/bgr"
+  boundary: "sample_data/sofia_boundary.geojson"
+  manifest: "data/interim/sample_manifest.csv"
+  archive: "sample_data/archive"
+  hourly: "data/interim/sample_hourly.csv"
+  completeness_year: "data/processed/sample_year.csv"
+  completeness_season: "data/processed/sample_season.csv"
+  panel: "data/processed/sample_panel.csv"
+  daily: "data/processed/sample_daily.csv"
+
+manifest:
+  continuing_after: "2023-10-01"
+  historical_qc_prefix: "1233"
+  require_spread: 3
+
+download:
+  workers: 2
+  retries: 0
+  timeout_seconds: 5
+
+qc:
+  pm25_min: 0.0
+  pm25_max: 1000.0
+  minimum_twenty_minute_bins: 3
+  temporal_window_hours: 24
+  temporal_min_periods: 3
+  temporal_mad_multiplier: 8.0
+  temporal_absolute_floor: 75.0
+
+aggregation:
+  minimum_valid_hours_per_day: 1
+
+completeness:
+  minimum_valid_hours_per_day: 1
+  panel_minimum_hour_fraction: 0.01
+  panel_periods:
+    sample_period: ["2024-01-01", "2024-01-01"]
