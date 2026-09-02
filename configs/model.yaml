@@ -1,0 +1,40 @@
+# Planned Random Forest stage. This file records the MVP design but is not used
+# by the sensor-extraction scripts yet.
+training:
+  start_date: "2018-01-01"
+  end_date: "2024-12-31"
+  heating_months: [1, 2, 3, 10, 11, 12]
+
+counterfactual_periods:
+  - name: "post_2025_jan_mar"
+    start_date: "2025-01-01"
+    end_date: "2025-03-31"
+  - name: "post_2025_2026_heating"
+    start_date: "2025-10-01"
+    end_date: "2026-03-31"
+
+random_forest:
+  random_state: 42
+  # Hyperparameters will be added after the validation design and predictor
+  # table have been inspected.
+
+planned_predictors:
+  meteorology:
+    - temperature
+    - relative_humidity
+    - wind_speed
+    - wind_direction
+    - surface_pressure
+    - precipitation
+    - boundary_layer_height
+  temporal:
+    - day_of_year_sin
+    - day_of_year_cos
+    - weekday
+    - heating_season
+  spatial:
+    - latitude
+    - longitude
+    - elevation
+  optional_background:
+    - cams_pm2_5

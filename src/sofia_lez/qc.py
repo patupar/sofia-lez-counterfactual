@@ -63,7 +63,7 @@ def _read_archive_file(
 
 def _temporal_qc(group: pd.DataFrame, settings: dict) -> pd.DataFrame:
     group = group.sort_values("hour_utc").copy()
-    values = group["raw_pm2_5"]
+    values = group["pm2_5"]
     window = int(settings["temporal_window_hours"])
     minimum = int(settings["temporal_min_periods"])
     rolling_median = values.rolling(window, center=True, min_periods=minimum).median()
@@ -77,10 +77,11 @@ def _temporal_qc(group: pd.DataFrame, settings: dict) -> pd.DataFrame:
     return group
 
 
-def build_hourly_qc(config: dict) -> pd.DataFrame:
-    """Reconstruct hourly PM2.5 and apply range, coverage, and temporal checks."""
+def build_archive_hourly(config: dict) -> pd.DataFrame:
+    """Reconstruct and quality-control the 2024+ Sensor.Community archive."""
     manifest = pd.read_csv(config["paths"]["manifest"])
-    candidates = manifest.loc[manifest["plausible_continuing"].astype(bool)].copy()
+    continuing = manifest["plausible_continuing"].astype(str).str.lower().eq("true")
+    candidates = manifest.loc[continuing].copy()
     valid_pairs = set(
         zip(candidates["sensor_id"].astype(int), candidates["location_id"].astype(int), strict=True)
     )
@@ -100,8 +101,18 @@ def build_hourly_qc(config: dict) -> pd.DataFrame:
         ["location_id", "sensor_id", "hour_utc"], keep="last"
     )
 
+    archive_start = pd.Timestamp(config["project"]["archive_start_date"], tz="UTC")
+    project_end = pd.Timestamp(config["project"]["end_date"]).date()
+    hourly = hourly.loc[
+        hourly["hour_utc"].ge(archive_start)
+        & hourly["hour_local"].dt.date.le(project_end)
+    ].copy()
+    if hourly.empty:
+        raise ValueError("Archive files were found, but none fall inside the configured dates")
+
     settings = config["qc"]
-    hourly["qc_range"] = hourly["raw_pm2_5"].between(
+    hourly = hourly.rename(columns={"raw_pm2_5": "pm2_5"})
+    hourly["qc_range"] = hourly["pm2_5"].between(
         float(settings["pm25_min"]), float(settings["pm25_max"]), inclusive="both"
     )
     hourly["qc_spread"] = hourly["spread"].ge(int(settings["minimum_twenty_minute_bins"]))
@@ -114,6 +125,11 @@ def build_hourly_qc(config: dict) -> pd.DataFrame:
     )
     hourly["qc_pass"] = hourly[["qc_range", "qc_spread", "qc_temporal"]].all(axis=1)
     hourly["location"] = "SC" + hourly["location_id"].astype(int).astype(str)
+    hourly["date_local"] = hourly["hour_local"].dt.date.astype(str)
+    hourly["data_source"] = "sensor_community"
+    hourly["source_qc_code"] = pd.Series(pd.NA, index=hourly.index, dtype="string")
+    hourly["qc_source_code"] = pd.Series(pd.NA, index=hourly.index, dtype="boolean")
+    hourly["qc_method"] = "range + three 20-minute bins + rolling MAD"
 
     coordinates = candidates.drop_duplicates(["location_id", "sensor_id"])[
         ["location_id", "sensor_id", "lat", "lon"]
@@ -127,15 +143,25 @@ def build_hourly_qc(config: dict) -> pd.DataFrame:
         "location_id",
         "lat",
         "lon",
-        "raw_pm2_5",
+        "pm2_5",
         "n_observations",
         "spread",
+        "date_local",
+        "data_source",
+        "source_qc_code",
+        "qc_method",
+        "qc_source_code",
         "qc_range",
         "qc_spread",
         "qc_temporal",
         "qc_pass",
     ]
     hourly = hourly[columns].sort_values(["location_id", "sensor_id", "hour_utc"])
-    ensure_parent(config["paths"]["hourly"])
-    hourly.to_csv(config["paths"]["hourly"], index=False)
+    ensure_parent(config["paths"]["archive_hourly"])
+    hourly.to_csv(config["paths"]["archive_hourly"], index=False)
     return hourly
+
+
+def build_hourly_qc(config: dict) -> pd.DataFrame:
+    """Backward-compatible name for the archive-only processing stage."""
+    return build_archive_hourly(config)

@@ -8,17 +8,22 @@ from .config import ensure_parent
 
 
 def aggregate_daily(config: dict) -> pd.DataFrame:
-    """Aggregate passing local hours and suppress incomplete sensor-days."""
-    hourly = pd.read_csv(config["paths"]["hourly"])
+    """Aggregate passing local hours and retain incomplete sensor-days as missing."""
+    hourly = pd.read_csv(config["paths"]["hourly"], low_memory=False)
     timezone = config["project"]["timezone"]
     hourly["hour_local"] = pd.to_datetime(hourly["hour_local"], utc=True).dt.tz_convert(timezone)
     hourly["qc_pass"] = hourly["qc_pass"].astype(str).str.lower().eq("true")
-    valid = hourly.loc[hourly["qc_pass"]].copy()
-    valid["date"] = valid["hour_local"].dt.date.astype(str)
+    hourly["date"] = hourly["hour_local"].dt.date.astype(str)
+    hourly["pm2_5_valid"] = hourly["pm2_5"].where(hourly["qc_pass"])
     index = ["date", "location", "location_id", "sensor_id", "lat", "lon"]
     daily = (
-        valid.groupby(index, as_index=False)
-        .agg(pm2_5=("raw_pm2_5", "mean"), valid_hours=("raw_pm2_5", "size"))
+        hourly.groupby(index, as_index=False)
+        .agg(
+            pm2_5=("pm2_5_valid", "mean"),
+            observed_hours=("pm2_5", "count"),
+            valid_hours=("pm2_5_valid", "count"),
+            data_source=("data_source", lambda values: "+".join(sorted(set(values)))),
+        )
         .sort_values(["location_id", "sensor_id", "date"])
     )
     minimum = int(config["aggregation"]["minimum_valid_hours_per_day"])

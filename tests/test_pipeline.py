@@ -7,7 +7,7 @@ from sofia_lez.config import load_config
 from sofia_lez.daily import aggregate_daily
 from sofia_lez.downloader import candidate_urls
 from sofia_lez.manifest import build_manifest
-from sofia_lez.qc import build_hourly_qc
+from sofia_lez.sensors import build_unified_hourly
 from sofia_lez.spatial import load_polygons, point_in_boundary
 
 ROOT = Path(__file__).parents[1]
@@ -38,6 +38,8 @@ def test_sample_pipeline(tmp_path):
     config = load_config(ROOT / "configs/sample.yaml")
     for key in (
         "manifest",
+        "filter_hourly",
+        "archive_hourly",
         "hourly",
         "completeness_year",
         "completeness_season",
@@ -50,19 +52,26 @@ def test_sample_pipeline(tmp_path):
     assert list(manifest["location"]) == ["SC100"]
     assert bool(manifest.loc[0, "plausible_continuing"])
 
-    hourly = build_hourly_qc(config)
-    assert len(hourly) == 1
-    assert hourly.loc[0, "raw_pm2_5"] == 21.0
-    assert int(hourly.loc[0, "spread"]) == 3
-    assert bool(hourly.loc[0, "qc_pass"])
+    hourly = build_unified_hourly(config)
+    assert len(hourly) == 3
+    assert set(hourly["data_source"]) == {"filter", "sensor_community"}
+    historical = hourly.loc[hourly["data_source"].eq("filter")].reset_index(drop=True)
+    archive = hourly.loc[hourly["data_source"].eq("sensor_community")].reset_index(drop=True)
+    assert list(historical["pm2_5"]) == [20.0, 22.0]
+    assert list(historical["qc_pass"]) == [True, False]
+    assert archive.loc[0, "pm2_5"] == 21.0
+    assert int(archive.loc[0, "spread"]) == 3
+    assert bool(archive.loc[0, "qc_pass"])
 
     years, seasons = calculate_completeness(config)
-    assert years.loc[0, "valid_hours"] == 1
+    assert years["valid_hours"].sum() == 2
     assert "sample_period" in set(seasons["season"])
 
     panel = select_stable_panel(config)
     assert bool(panel.loc[0, "stable_panel"])
 
     daily = aggregate_daily(config)
-    assert daily.loc[0, "pm2_5"] == 21.0
-    assert bool(daily.loc[0, "daily_qc_pass"])
+    assert len(daily) == 2
+    assert list(daily["pm2_5"]) == [20.0, 21.0]
+    assert list(daily["observed_hours"]) == [2, 1]
+    assert daily["daily_qc_pass"].all()

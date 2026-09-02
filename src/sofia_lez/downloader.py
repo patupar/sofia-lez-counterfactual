@@ -83,10 +83,11 @@ def _download_one(job: DownloadJob, config: dict) -> dict:
 def download_archive(config: dict) -> dict[str, int]:
     """Download each plausible sensor/day once, preserving raw source files."""
     manifest = pd.read_csv(config["paths"]["manifest"])
-    sensors = sorted(
-        manifest.loc[manifest["plausible_continuing"].astype(bool), "sensor_id"].unique()
+    continuing = manifest["plausible_continuing"].astype(str).str.lower().eq("true")
+    sensors = sorted(manifest.loc[continuing, "sensor_id"].unique())
+    days = pd.date_range(
+        config["project"]["archive_start_date"], config["project"]["end_date"], freq="D"
     )
-    days = pd.date_range(config["project"]["start_date"], config["project"]["end_date"], freq="D")
     root = config["paths"]["archive"]
     jobs = [
         DownloadJob(

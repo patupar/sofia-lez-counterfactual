@@ -83,12 +83,12 @@ def _heating_seasons(project_start: pd.Timestamp, project_end: pd.Timestamp):
 
 def calculate_completeness(config: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Write sensor-year plus standard and intervention-aligned season metrics."""
-    hourly = pd.read_csv(config["paths"]["hourly"])
+    hourly = pd.read_csv(config["paths"]["hourly"], low_memory=False)
     hourly["hour_local"] = pd.to_datetime(hourly["hour_local"], utc=True).dt.tz_convert(
         config["project"]["timezone"]
     )
     hourly["qc_pass"] = hourly["qc_pass"].astype(str).str.lower().eq("true")
-    project_start = pd.Timestamp(config["project"]["start_date"])
+    project_start = pd.Timestamp(config["project"]["study_start_date"])
     project_end = pd.Timestamp(config["project"]["end_date"])
     timezone = config["project"]["timezone"]
     minimum = int(config["completeness"]["minimum_valid_hours_per_day"])

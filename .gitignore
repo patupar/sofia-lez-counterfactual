@@ -14,6 +14,20 @@ data/processed/**
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+!data/raw/**/
+!data/interim/**/
+!data/processed/**/
+!data/raw/**/.gitkeep
+!data/interim/**/.gitkeep
+!data/processed/**/.gitkeep
+
+# Trained models and generated results
+models/**
+outputs/figures/**
+outputs/tables/**
+!models/.gitkeep
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
 
 # Local configuration and download state
 configs/local.yaml

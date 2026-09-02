@@ -1,6 +1,9 @@
 project:
-  start_date: "2024-01-01"
+  study_start_date: "2023-10-01"
+  filter_end_date: "2023-12-31"
+  archive_start_date: "2024-01-01"
   end_date: "2024-01-01"
+  intervention_start_date: "2025-01-01"
   timezone: "Europe/Sofia"
 
 sources:
@@ -14,11 +17,22 @@ paths:
   boundary: "sample_data/sofia_boundary.geojson"
   manifest: "data/interim/sample_manifest.csv"
   archive: "sample_data/archive"
+  filter_hourly: "data/interim/sample_filter_hourly.csv"
+  archive_hourly: "data/interim/sample_archive_hourly.csv"
   hourly: "data/interim/sample_hourly.csv"
   completeness_year: "data/processed/sample_year.csv"
   completeness_season: "data/processed/sample_season.csv"
   panel: "data/processed/sample_panel.csv"
   daily: "data/processed/sample_daily.csv"
+  meteorology: "data/raw/meteorology"
+  background: "data/raw/background"
+  policy: "data/raw/policy"
+  predictors: "data/interim/predictors/sample_predictors.csv"
+  model_table: "data/processed/sample_model_table.csv"
+  model_file: "models/sample_random_forest.joblib"
+  predictions: "data/processed/sample_counterfactual_predictions.csv"
+  figures: "outputs/figures"
+  tables: "outputs/tables"
 
 manifest:
   continuing_after: "2023-10-01"

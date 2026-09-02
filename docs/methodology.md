@@ -3,7 +3,7 @@
 ## 1. Scope
 
 The pipeline constructs the outcome panel needed for a counterfactual analysis of Sofia's
-residential-heating LEZ. Its temporal scope is 1 January 2024 through 31 March 2026, inclusive.
+residential-heating LEZ. Its temporal scope is 1 January 2018 through 31 March 2026, inclusive.
 It does not fit the final counterfactual model: it establishes the sensor identities,
 coordinates, availability diagnostics, hourly QC decisions, and daily PM2.5 outcome on which
 that model can safely depend.
@@ -58,7 +58,16 @@ only after successful completion. Every attempt is appended to `download_ledger.
 missing dates and resumptions auditable. A 404 is recorded as missing rather than converted to
 a zero concentration.
 
-## 4. Hourly reconstruction and QC
+## 4. Unified hourly observations and QC
+
+Historical FILTER `raw_pm2_5` observations are read from each selected BGR pair from 2018
+through 2023. An hour passes when its `raw_qc` begins with the configured prefix (`1233`), its
+`spread` equals three, and its PM2.5 lies inside the configured range. The FILTER correction
+columns are not used because they are not populated consistently. The original QC code remains
+in `source_qc_code`.
+
+Sensor.Community archive observations are used from 1 January 2024 onward. The two sources do
+not overlap in the default configuration.
 
 For SDS011 files, Sensor.Community `P2` is read as raw PM2.5 in µg/m³. `P1` is not used. UTC
 timestamps are parsed first, then converted to `Europe/Sofia` for local reporting. Within each
@@ -78,7 +87,9 @@ The same explicit archive QC is applied to every 2024–March 2026 hour:
 
 Every component is retained as `qc_range`, `qc_spread`, and `qc_temporal`; `qc_pass` is their
 logical conjunction. Thus alternative thresholds can be rerun and compared. The output also
-retains raw observation count and coordinates.
+retains raw observation count and coordinates. The unified output additionally records
+`data_source`, `source_qc_code`, `qc_method`, and `qc_source_code`, so the different source-QC
+definitions remain visible rather than being presented as identical.
 
 This is a transparent project QC for the later raw archive, **not a claim of bit-for-bit FILTER
 replication**. FILTER's spatial checks and correction model are not present in the archive. A
@@ -94,7 +105,7 @@ fraction, expected local days, and days meeting the daily-hour minimum.
 
 Two tables are produced:
 
-- **sensor-year:** 2024, 2025, and the partial project year ending 31 March 2026;
+- **sensor-year:** 2018–2025 and the partial project year ending 31 March 2026;
 - **sensor-season:** conventional October–March heating seasons plus explicitly configured
   intervention-aligned panel periods.
 
@@ -127,7 +138,9 @@ a spatial layer with WGS84 (`EPSG:4326`) or projected later to a suitable metric
 | File | Unit of observation |
 |---|---|
 | `sofia_sensor_manifest.csv` | historical location-sensor pair |
-| `pm25_hourly_qc.csv` | location-sensor-hour |
+| `filter_hourly_qc.csv` | historical FILTER location-sensor-hour |
+| `archive_hourly_qc.csv` | Sensor.Community location-sensor-hour |
+| `pm25_hourly_unified.csv` | combined location-sensor-hour |
 | `completeness_sensor_year.csv` | location-sensor-year |
 | `completeness_sensor_season.csv` | location-sensor-period |
 | `stable_panel.csv` | candidate location-sensor pair |

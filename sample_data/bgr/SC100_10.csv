@@ -1,3 +1,4 @@
 hour_timestamp,sensor_id,location,raw_pm2_5,spread,raw_qc,corrected_pm2_5,corrected_ci_down,corrected_ci_up,correction_improvement,corrected_qc
 1696118400,10,SC100,20.0,3,12331,,,,,
+1696122000,10,SC100,22.0,3,12000,,,,,
 1704067200,10,SC100,25.0,3,12331,,,,,

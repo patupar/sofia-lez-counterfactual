@@ -11,7 +11,7 @@ from .config import load_config
 from .daily import aggregate_daily
 from .downloader import download_archive
 from .manifest import build_manifest
-from .qc import build_hourly_qc
+from .sensors import build_unified_hourly
 
 
 def _manifest(config: dict) -> dict:
@@ -28,10 +28,12 @@ def _download(config: dict) -> dict:
 
 
 def _qc(config: dict) -> dict:
-    table = build_hourly_qc(config)
+    table = build_unified_hourly(config)
+    source_counts = table.groupby("data_source").size().to_dict()
     return {
         "hourly_rows": len(table),
         "qc_pass_rows": int(table["qc_pass"].sum()),
+        "rows_by_source": source_counts,
         "output": str(config["paths"]["hourly"]),
     }
 
@@ -85,16 +87,21 @@ def build_parser() -> argparse.ArgumentParser:
         subparsers.add_parser(command, help={
             "manifest": "spatially filter Sofia pairs and summarize historical coverage",
             "download": "download 2024–2026 archive files for plausible continuing sensors",
-            "qc-hourly": "reconstruct hours and apply consistent archive QC",
+            "qc-hourly": "combine FILTER and archive hours with documented source-specific QC",
             "completeness": "calculate sensor-year and sensor-season completeness",
             "select-panel": "choose pairs complete in every configured pre/post period",
             "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
         }[command])
-    run = subparsers.add_parser("run", help="run the complete sequence")
+    run = subparsers.add_parser("run", help="run the implemented data-preparation sequence")
     run.add_argument(
         "--skip-download",
         action="store_true",
         help="use already cached archive files (especially useful during development)",
+    )
+    run.add_argument(
+        "--include-provisional-panel",
+        action="store_true",
+        help="also apply the provisional panel threshold before it has been reviewed",
     )
     return parser
 
@@ -109,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
     steps = list(COMMANDS)
     if args.skip_download:
         steps.remove("download")
+    if not args.include_provisional_panel:
+        steps.remove("select-panel")
     summary = {}
     for step in steps:
         print(f"[{step}]", flush=True)

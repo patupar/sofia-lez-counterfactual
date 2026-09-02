@@ -1,6 +1,9 @@
 project:
-  start_date: "2024-01-01"
+  study_start_date: "2018-01-01"
+  filter_end_date: "2023-12-31"
+  archive_start_date: "2024-01-01"
   end_date: "2026-03-31"
+  intervention_start_date: "2025-01-01"
   timezone: "Europe/Sofia"
 
 sources:
@@ -14,13 +17,27 @@ paths:
   sensor_locations: "data/raw/filter/Sensor_Location.csv"
   bgr_directory: "data/raw/filter/BGR"
   boundary: "data/raw/boundaries/sofia_municipality.geojson"
-  manifest: "data/interim/sofia_sensor_manifest.csv"
+  manifest: "data/interim/sensors/sofia_sensor_manifest.csv"
   archive: "data/raw/sensor_community"
-  hourly: "data/interim/pm25_hourly_qc.csv"
-  completeness_year: "data/processed/completeness_sensor_year.csv"
-  completeness_season: "data/processed/completeness_sensor_season.csv"
-  panel: "data/processed/stable_panel.csv"
-  daily: "data/processed/pm25_daily.csv"
+  filter_hourly: "data/interim/sensors/filter_hourly_qc.csv"
+  archive_hourly: "data/interim/sensors/archive_hourly_qc.csv"
+  hourly: "data/interim/sensors/pm25_hourly_unified.csv"
+  completeness_year: "data/interim/diagnostics/completeness_sensor_year.csv"
+  completeness_season: "data/interim/diagnostics/completeness_sensor_season.csv"
+  panel: "data/interim/diagnostics/stable_panel.csv"
+  daily: "data/processed/daily_pm25.csv"
+
+  # Reserved for the next project stages. They are not populated by the
+  # sensor workflow yet.
+  meteorology: "data/raw/meteorology"
+  background: "data/raw/background"
+  policy: "data/raw/policy"
+  predictors: "data/interim/predictors/daily_predictors.csv"
+  model_table: "data/processed/model_table.csv"
+  model_file: "models/random_forest.joblib"
+  predictions: "data/processed/counterfactual_predictions.csv"
+  figures: "outputs/figures"
+  tables: "outputs/tables"
 
 manifest:
   # A historical pair is a plausible 2024+ continuation if it was still seen
