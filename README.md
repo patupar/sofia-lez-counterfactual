@@ -1,25 +1,26 @@
-# Heating the City, Clearing the Air?
+# Am I breathing cleaner air? | Дишам ли по-чист въздух?
 
-## General information
+## Prelude
 
-This repository prepares a reproducible PM2.5 sensor panel for a counterfactual study of
-Sofia's residential-heating low-emission zone (LEZ). It turns the historical FILTER BGR
-inventory and the Sensor.Community daily archive into spatially embedded, quality-controlled
-hourly and daily observations for **2024-01-01 through 2026-03-31 (inclusive)**.
+This repository holds the codebase for a seminar paper initially conceived for the Institute of Geography, Ruprecht-Karl-University Heidelberg. Goal of the work is to present a reproducible counterfactual study of Sofia, Bulgaria 
+recently introduced residential heating low emission zone (LEZ). Later versions will aim to bring this academic work to public use. Ultimately, residents of Sofia should be able to observe on a day-by-day basis whether the air quality in their neighbourhood has actually improved as a result of the LEZ intervention.   
 
-The workflow deliberately distinguishes two decisions:
+## General information: 'Counterfactual Assessment of Sofia's Residential Heating Low Emission Zone'
+On the 1 January 2025, Sofia implemented Europe’s first low-emission zone (LEZ) targeting residential heating. The
+intervention prohibits the use of solid-fuels in buildings across nine districts, given operational district-
+heating or gas distribution networks are available. The codebase for the above mentioned study presents an exploratory counterfactual assessment of changes in ambient PM2.5 concentrations following the intervention. To the author’s
+knowledge, it is the first such assessment of Sofia’s residential-heating LEZ to use post-intervention
+PM2.5 measurements.
 
-1. **Plausible continuation** limits archive downloads to historical Sofia location-sensor
-   pairs observed near the end of the FILTER record.
-2. **Stable panel selection** is made only after archive QC, using explicit sensor-period
-   completeness thresholds.
+Daily PM2.5 observations from BGAir’s community-operated sensor network, as at the point writing, Sofia's regulatory monitoring network exhibits an unsatisfactory level of spatial coverage. A secondary objective of this work is to observe whether community-operate sensor networks and volunteered geographic information as a whole, can be leveraged in the study of Sofia's urban environment and potentially inform public decision making.    
 
-This prevents the practical download filter from silently becoming an analytical inclusion
-rule. The full raw observations are never committed to Git.
+Random forest models trained on pre-intervention observations from 2018–2024 predict PM2.5 concentrations during the heating
+periods between January 2025 and March 2026, accounting for meteorological and temporal variation.
+Model predictions reflect expected PM2.5 concentrations in absence of the LEZ intervention.
 
 ## Getting started
 
-Requirements: Python 3.11 or newer; no GPU is needed.
+Requirements: Python 3.11 or newer.
 
 ```bash
 git clone https://github.com/patupar/sofia-lez-counterfactual.git
@@ -75,7 +76,7 @@ Downloads are resumable. If the archive is already cached, use `run --skip-downl
 Each command prints a small machine-readable JSON summary and writes a CSV output. Use
 `sofia-lez --help` or `sofia-lez COMMAND --help` for command help.
 
-## ML workflow
+## Data workflow
 
 ```text
 src/sofia_lez/
@@ -96,7 +97,7 @@ src/sofia_lez/
 | Panel | `data/processed/stable_panel.csv` | Threshold decision for every candidate pair |
 | Daily | `data/processed/pm25_daily.csv` | Local-date PM2.5 after hourly QC and daily coverage check |
 
-The default municipality geometry is the official SofiaPlan dataset. The downloader tries
+The default municipality geometry is derived from SofiaPlan. The downloader tries
 both known Sensor.Community layouts (year-nested and root date folders) and both `.csv` and
 `.csv.gz` files.
 
