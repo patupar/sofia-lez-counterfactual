@@ -39,7 +39,7 @@ Considering 133 started reporting in 2018, and 204 before 2020, methodology coul
 
 ### Spatial inspection
 
-[**sensor_candidate_distriubtion.pdf**](../outputs/figures/sensor_candidate_distriubtion.pdf)
+[**sensor_candidate_distriubtion.pdf**](../outputs/figures/sensor_candidate_distribution.pdf)
 
 ### Extract Sensor.Community archive data
 
