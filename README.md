@@ -25,7 +25,7 @@ Requirements: Python 3.11 or newer.
 git clone https://github.com/patupar/sofia-lez-counterfactual.git
 cd sofia-lez-counterfactual
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate          
 python -m pip install -e ".[dev]"
 ```
 
