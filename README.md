@@ -7,12 +7,11 @@ recently introduced residential heating low emission zone (LEZ). Later versions 
 
 ## General information: 'Counterfactual Assessment of Sofia's Residential Heating Low Emission Zone'
 On the 1 January 2025, Sofia implemented Europe’s first low-emission zone (LEZ) targeting residential heating. The
-intervention prohibits the use of solid-fuels in buildings across nine districts, given operational district-
-heating or gas distribution networks are available. The codebase for the above mentioned study presents an exploratory counterfactual assessment of changes in ambient PM2.5 concentrations following the intervention. To the author’s
+intervention prohibits the use of solid-fuels in buildings across nine districts, given operational district-heating or gas distribution networks are available. The codebase for the above mentioned study presents an exploratory counterfactual assessment of changes in ambient PM2.5 concentrations following the intervention. To the author’s
 knowledge, it is the first such assessment of Sofia’s residential-heating LEZ to use post-intervention
 PM2.5 measurements.
 
-Daily PM2.5 observations from BGAir’s community-operated sensor network, as at the point writing, Sofia's regulatory monitoring network exhibits an unsatisfactory level of spatial coverage. A secondary objective of this work is to observe whether community-operate sensor networks and volunteered geographic information as a whole, can be leveraged in the study of Sofia's urban environment and potentially inform public decision making.    
+Daily PM2.5 observations from BGAir’s community-operated sensor network are used, as at the point writing, Sofia's regulatory monitoring network exhibits an unsatisfactory level of spatial coverage. A secondary objective of this work is to observe whether community-operate sensor networks and volunteered geographic information as a whole, can be leveraged in the study of Sofia's urban environment and potentially inform public decision making.    
 
 Random forest models trained on pre-intervention observations from 2018–2024 predict PM2.5 concentrations during the heating
 periods between January 2025 and March 2026, accounting for meteorological and temporal variation.
