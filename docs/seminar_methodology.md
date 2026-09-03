@@ -53,7 +53,7 @@ The manifest marks a pair as `plausible_continuing` when its last raw observatio
 after 1 October 2023. This flag limits archive requests. It is not the final rule for analytical
 inclusion. The completeness assessment `scripts/04_check_sensor_completeness.py` defines the final sensor panel.
 
-Note: _BGAir/FILTER records are retrieved from this [link](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) under BGR.zip. Sensor_Location.csv is provided in this repository but can be retrieved from the same page._
+**Note:** _BGAir/FILTER records are retrieved from this [link](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) under BGR.zip. Sensor_Location.csv is provided in this repository but can be retrieved from the same page._
 
 #### Sensor.Community archive
 
@@ -68,7 +68,7 @@ transfer. It skips existing non-empty files. `download_ledger.jsonl` records eac
 cached or missing sensor-date request. A missing archive file remains missing; the code does not
 replace it with a zero concentration.
 
-Note: _Running the corresponding `scripts/02_download_archive.py` to completion takes considerable time.
+**Note:** _Running the corresponding `scripts/02_download_archive.py` to completion takes considerable time.
 It is advised to run this script on a stable and fast internet connection. However, if the program is 
 interrupted, running `02_download_archive` will resume from the last saved file. Check research_log
 on instructions to setup a status ticker. _
@@ -156,7 +156,8 @@ sensor-location pair. Later tables retain both identifiers and the coordinates.
 
 Each sensor location is assigned to a Sofia administrative district. This identifies sensors 
 located within the nine districts covered by LEZ. 
-Note: _District membership is used for spatial context. Membership does not attribute that sensor surroundings are directly affected by the LEZ. Within the nine covered districts, the restriction
+
+**Note:** _District membership is used for spatial context. Membership does not attribute that sensor surroundings are directly affected by the LEZ. Within the nine covered districts, the restriction
 applies only to buildings on streets with an operational district-heating or gas-distribution
 network._
 
@@ -225,7 +226,11 @@ The counterfactual periods are:
 The prediction table retains observed PM2.5, predicted no-LEZ PM₂.₅, date and sensor-location
 identifiers. This supports comparisons by date, sensor and administrative district.
 
-## 5. Code and data reference
+## 5. Anomaly assessment
+
+## 6. Code and data reference
+The table below outlines each methodological step to its relevant script, module and resulting 
+output. 
 
 | Method | Entry point | Core module | Main output |
 |---|---|---|---|
@@ -236,13 +241,6 @@ identifiers. This supports comparisons by date, sensor and administrative distri
 | Select stable panel | `sofia-lez select-panel` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
 
 All entry points read `configs/pipeline.yaml`. `pyproject.toml` defines the Python dependencies.
-`sample_data/` contains small fixtures that test the same input and output contracts without
-redistributing the full observations. `tests/test_pipeline.py` tests the spatial filter, archive
+`sample_data/` contains synthetic data for `tests/test_pipeline.py` where  spatial filter, archive
 URL patterns, manifest construction, source combination, completeness rules and daily
-aggregation.
-
-Raw data remain outside Git. A reproducible analysis records the Git commit, configuration,
-Python environment, input checksums and archive download ledger. `pytest` and the GitHub Actions
-workflow provide independent checks of the code path used for the sample data.
-
-## 6. Anomaly assessment
+aggregation were tested. 
