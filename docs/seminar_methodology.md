@@ -1,16 +1,20 @@
-# Seminar methodology: Sofia residential-heating LEZ counterfactual
+# Codebase Documentation: A counterfactual assessment of Sofia's Residential Heating Low Emission Zone 
 
-## 1. Scope
+## 1. Prelude
 
-This document describes the technical methodology for the GeoML seminar project. The analysis
-estimates daily particulate matter concentrations with an aerodynamic diameter below 2.5 µm
-(PM2.5) in Sofia under a counterfactual without the residential-heating low-emission zone (LEZ).
-The LEZ entered into force on 1 January 2025.
+This document provides the technical documentation for the codebase of the related GeoML seminar 
+project. It describes the employed methodology and relevant scripts. 
 
-The main unit of analysis is one sensor-location pair on one local date. The study period runs
-from 1 January 2018 through 31 March 2026. The model uses observations before 1 January 2025 for
-training and validation. It then predicts the PM2.5 concentrations expected after that date if
-the pre-LEZ relationship between PM2.5, weather, time and location had continued.
+### 1.1 Spatial and temporal framework
+The employed methodology is intended for the study area Sofia, Bulgaria as defined by its
+municipal boundaries. The intended study period runs from 1 January 2018 through 31 March 2026. 
+Modelling uses observations before 1 January 2025 for training and validation. It then predicts the PM2.5 concentrations expected after that date if the pre-LEZ relationship between PM2.5, weather, time 
+and location had continued.
+
+### 1.2 Data sources
+
+#### 1.2.1 PM2.5
+PM2.5 training data is derived from community-operated sensors within the study area. 
 
 The sensor record combines two sources:
 
@@ -22,6 +26,10 @@ The sensor record combines two sources:
 Both sources provide raw PM2.5 observations. Empty FILTER correction fields are not used, and
 raw values are not described as corrected concentrations. `configs/pipeline.yaml` records the
 dates, paths and thresholds that control the data workflow.
+
+#### 1.2.1 Meteorological Data
+[Draft: Derived from ERA5 ...]
+
 
 ## 2. Preprocessing
 
@@ -43,7 +51,7 @@ sensor can occur at different locations.
 
 The manifest marks a pair as `plausible_continuing` when its last raw observation occurs on or
 after 1 October 2023. This flag limits archive requests. It is not the final rule for analytical
-inclusion. The completeness assessment defines the final sensor panel.
+inclusion. The completeness assessment `scripts/04_check_sensor_completeness.py` defines the final sensor panel.
 
 #### Sensor.Community archive
 
@@ -58,17 +66,14 @@ transfer. It skips existing non-empty files. `download_ledger.jsonl` records eac
 cached or missing sensor-date request. A missing archive file remains missing; the code does not
 replace it with a zero concentration.
 
+Note: Running the corresponding `scripts/02_download_archive.py` to completion takes considerable time.
+It is advised to run this script on a stable and fast internet connection. However, if the program is 
+interrupted, running `02_download_archive` will resume from the last saved file. Check research_log
+on instructions to setup a status ticker. 
+
 #### Meteorological data
 
-Meteorological inputs must cover the complete study period and the Sofia study area. Their
-technical specification must identify:
-
-- the data provider, product and version;
-- each variable and its unit;
-- temporal resolution and timestamp convention;
-- spatial resolution and coordinate reference system;
-- the method used to extract values at sensor locations; and
-- the treatment of missing or invalid values.
+Meteorological inputs must cover the complete study period and the Sofia study area. [...]
 
 The preprocessing workflow harmonises these inputs to the sensor-day observations before it
 constructs the model table.
@@ -92,8 +97,8 @@ value when the correction columns are empty.
 #### Sensor.Community observations
 
 The archive workflow reads SDS011 `P2` as raw PM2.5. It does not use `P1`. Timestamps are first
-parsed as Coordinated Universal Time (UTC). Observations within each UTC hour are assigned to
-three twenty-minute bins: minutes 0–19, 20–39 and 40–59. The arithmetic mean of `P2` forms the
+parsed as UTC. Observations within each UTC hour are assigned to
+three twenty-minute bins: minutes 0–19, 20–39 and 40–59. The  mean of `P2` forms the
 hourly value.
 
 An archive hour passes QC when all of the following conditions are true:
