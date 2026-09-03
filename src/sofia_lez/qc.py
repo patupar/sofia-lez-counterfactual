@@ -13,6 +13,12 @@ from .config import ensure_parent
 ARCHIVE_PATTERN = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2})_sensor_(?P<sensor>\d+)\.csv(?:\.gz)?$")
 
 
+def _median_absolute_deviation(values: np.ndarray) -> float:
+    """Return the unscaled median absolute deviation for one rolling window."""
+    median = np.median(values)
+    return float(np.median(np.abs(values - median)))
+
+
 def _read_archive_file(
     path: Path, valid_pairs: set[tuple[int, int]], timezone: str
 ) -> pd.DataFrame:
@@ -63,18 +69,36 @@ def _read_archive_file(
 
 def _temporal_qc(group: pd.DataFrame, settings: dict) -> pd.DataFrame:
     group = group.sort_values("hour_utc").copy()
+    group = group.set_index("hour_utc")
     values = group["pm2_5"]
-    window = int(settings["temporal_window_hours"])
+    window_hours = int(settings["temporal_window_hours"])
     minimum = int(settings["temporal_min_periods"])
-    rolling_median = values.rolling(window, center=True, min_periods=minimum).median()
+    rolling = values.rolling(
+        pd.Timedelta(window_hours, unit="h"),
+        center=True,
+        min_periods=minimum,
+    )
+    rolling_median = rolling.median()
     residual = (values - rolling_median).abs()
-    rolling_mad = residual.rolling(window, center=True, min_periods=minimum).median()
+    rolling_mad = rolling.apply(_median_absolute_deviation, raw=True)
     threshold = np.maximum(
         float(settings["temporal_absolute_floor"]),
         float(settings["temporal_mad_multiplier"]) * 1.4826 * rolling_mad,
     )
     group["qc_temporal"] = rolling_median.isna() | residual.le(threshold)
-    return group
+    return group.reset_index()
+
+
+def _archive_qc_method(settings: dict) -> str:
+    """Describe the configured archive QC rule in the output table."""
+    return (
+        f"range {settings['pm25_min']}-{settings['pm25_max']} ug/m3 + "
+        f"at least {settings['minimum_twenty_minute_bins']} twenty-minute bins + "
+        f"centered {settings['temporal_window_hours']}h rolling median/MAD "
+        f"(minimum {settings['temporal_min_periods']} values; "
+        f"threshold=max[{settings['temporal_absolute_floor']} ug/m3, "
+        f"{settings['temporal_mad_multiplier']} x 1.4826 x MAD])"
+    )
 
 
 def build_archive_hourly(config: dict) -> pd.DataFrame:
@@ -129,7 +153,7 @@ def build_archive_hourly(config: dict) -> pd.DataFrame:
     hourly["data_source"] = "sensor_community"
     hourly["source_qc_code"] = pd.Series(pd.NA, index=hourly.index, dtype="string")
     hourly["qc_source_code"] = pd.Series(pd.NA, index=hourly.index, dtype="boolean")
-    hourly["qc_method"] = "range + three 20-minute bins + rolling MAD"
+    hourly["qc_method"] = _archive_qc_method(settings)
 
     coordinates = candidates.drop_duplicates(["location_id", "sensor_id"])[
         ["location_id", "sensor_id", "lat", "lon"]

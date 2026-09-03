@@ -93,6 +93,15 @@ An hourly FILTER observation passes QC when all of the following conditions are 
 - `spread` equals `3`; and
 - `raw_pm2_5` lies within the configured range of 0–1000 µg/m³.
 
+The concentration range and spread criterion follow the FILTER methodology (Hassani et al.,
+2025). The upper boundary represents the plausible operating range of the low-cost sensors and
+is not derived from the highest PM₂.₅ concentration observed in Sofia.
+
+FILTER defines `spread` by dividing each hour into three twenty-minute bins. A value of `3`
+indicates that the observations used for the hourly mean cover all three parts of the hour. This
+provides a more representative hourly value than observations concentrated within only one part
+of the hour.
+
 The original FILTER code remains in `source_qc_code`. The code does not infer a corrected PM2.5
 value when the correction columns are empty.
 
@@ -109,15 +118,35 @@ An archive hour passes QC when all of the following conditions are true:
 2. All three twenty-minute bins contain at least one observation.
 3. The value passes a temporal spike check.
 
-The temporal check uses a centred rolling median and a rolling median absolute deviation (MAD)
-for each sensor-location pair. The default window is 360 hours and requires at least 72 values.
-The rejection threshold is the larger of 75 µg/m³ and eight scaled MAD values. The scale factor
-is 1.4826. An endpoint with too few observations for the rolling calculation is not rejected for
-that reason alone.
+The temporal check uses a centred 360-clock-hour window for each sensor-location pair. The
+rolling median and median absolute deviation (MAD) are calculated directly from the available
+values within that window. FILTER selected this window length because the variability of rolling
+MAD values stabilised at approximately 360 hours in European reference-station records (Hassani
+et al., 2025).
+
+The archive implementation adapts the FILTER procedure to the long and partly discontinuous
+Sensor.Community record. It requires at least 72 valid hourly values within the window, rather
+than the 90 used by FILTER. This relaxed requirement allows the temporal check to operate where
+short gaps occur without excluding extended parts of otherwise usable sensor records. If fewer
+than 72 values are available, the observation is not rejected solely because the temporal
+context is insufficient.
+
+A potential spike is evaluated against the larger of:
+
+- eight scaled median absolute deviations, where the scale factor is 1.4826; and
+- an absolute difference of 75 µg/m³ from the rolling median.
+
+These are deliberately permissive project settings rather than thresholds adopted directly from
+FILTER. They provide a simple safeguard against isolated extreme values while reducing the risk
+of removing genuine winter pollution episodes. FILTER uses nearby measurements to distinguish
+sensor errors from spatially coherent pollution events; the archive procedure does not reproduce
+that neighbour-based test. The absolute threshold therefore prevents small local variability
+from producing an excessively strict spike criterion.
 
 The archive procedure cannot reproduce all FILTER processing steps. In particular, it does not
-contain the FILTER spatial checks or correction model. The unified table therefore identifies
-the source and QC method for every hour instead of presenting the two QC procedures as identical.
+contain the FILTER constant-value, spatial-correlation, spatial-similarity or correction
+procedures. The unified table therefore identifies the source and exact QC settings for every
+hour instead of presenting the two QC procedures as identical.
 
 ### 2.3 Completeness and panel selection
 
@@ -136,6 +165,13 @@ The stable-panel rule requires at least 60% of expected hours in every configure
 | Post-LEZ | 1 October–31 December 2025 |
 | Post-LEZ | 1 January–31 March 2026 |
 
+The 60% threshold is a relaxed project-specific requirement rather than a regulatory
+completeness standard. The combined record spans several years and originates from a voluntary
+sensor network in which interruptions and changes in availability are expected. Requiring every
+sensor-location pair to satisfy a stricter threshold in every period could substantially reduce
+the spatial coverage of the stable panel. The selected threshold balances temporal continuity
+against sensor retention.
+
 The panel table retains all candidate pairs and records the decision in `stable_panel`. It does
 not delete pairs that fail the threshold. This permits inspection of sensor attrition and tests
 with alternative completeness thresholds.
@@ -143,9 +179,11 @@ with alternative completeness thresholds.
 ### 2.4 Daily aggregation
 
 `src/sofia_lez/daily.py` calculates the arithmetic mean of QC-valid hourly PM₂.₅ values for each
-sensor-location pair and local date. A day requires at least 18 valid hours. The table retains a
-day with fewer valid hours, but its `pm2_5` value is missing and `daily_qc_pass` is false. Missing
-values are not replaced with zero.
+sensor-location pair and local date. A day requires at least 18 valid hours, corresponding to 75%
+coverage of a 24-hour day. This completeness criterion has precedent in published PM₂.₅ analyses
+using low-cost sensor observations (Dhammapala et al., 2022). The table retains a day with fewer
+valid hours, but its `pm2_5` value is missing and `daily_qc_pass` is false. Missing values are not
+replaced with zero.
 
 ## 3. Spatial and temporal harmonisation
 
@@ -255,3 +293,14 @@ All entry points read `configs/pipeline.yaml`. `pyproject.toml` defines the Pyth
 `sample_data/` contains synthetic data for `tests/test_pipeline.py` where  spatial filter, archive
 URL patterns, manifest construction, source combination, completeness rules and daily
 aggregation were tested. 
+
+## 7. References
+
+Dhammapala, R., Huynh, T., & Singamsetti, V. (2022). Evaluation of twenty-three low-cost PM₂.₅
+sensors in the field: Can they be used for continuous monitoring? *Aerosol and Air Quality
+Research, 22*, 210266. https://doi.org/10.4209/aaqr.210266
+
+Hassani, A., Castell, N., Schneider, P., Taherian, M., & Hassani, A. (2025). Harmonized,
+standardized and corrected crowd-sourced low-cost sensor PM₂.₅ data from Sensor.Community and
+PurpleAir networks across Europe. *Journal of Environmental Management, 376*, 125100.
+https://doi.org/10.1016/j.jenvman.2025.125100
