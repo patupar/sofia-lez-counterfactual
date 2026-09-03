@@ -8,13 +8,13 @@ project. It describes the employed methodology and relevant scripts.
 ### 1.1 Spatial and temporal framework
 The employed methodology is intended for the study area Sofia, Bulgaria as defined by its
 municipal boundaries. The intended study period runs from 1 January 2018 through 31 March 2026. 
-Modelling uses observations before 1 January 2025 for training and validation. It then predicts the PM2.5 concentrations expected after that date if the pre-LEZ relationship between PM2.5, weather, time 
+Modelling uses observations before 1 January 2025 for training and validation. It then predicts PM₂.₅ concentrations expected after that date if the pre-LEZ relationship between PM₂.₅, weather, time 
 and location had continued.
 
 ### 1.2 Data sources
 
 #### 1.2.1 PM2.5
-PM2.5 training data is derived from community-operated sensors within the study area. 
+PM₂.₅ training data is derived from community-operated sensors within the study area. 
 
 The sensor record combines two sources:
 
@@ -23,7 +23,7 @@ The sensor record combines two sources:
 | BGAir/FILTER | 1 January 2018–31 December 2023 | `raw_pm2_5` |
 | Sensor.Community archive | 1 January 2024–31 March 2026 | SDS011 `P2` |
 
-Both sources provide raw PM2.5 observations. Empty FILTER correction fields are not used, and
+Both sources provide raw PM₂.₅ observations. Empty FILTER correction fields are not used, and
 raw values are not described as corrected concentrations. `configs/pipeline.yaml` records the
 dates, paths and thresholds that control the data workflow.
 
@@ -53,6 +53,8 @@ The manifest marks a pair as `plausible_continuing` when its last raw observatio
 after 1 October 2023. This flag limits archive requests. It is not the final rule for analytical
 inclusion. The completeness assessment `scripts/04_check_sensor_completeness.py` defines the final sensor panel.
 
+Note: _BGAir/FILTER records are retrieved from this [link](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) under BGR.zip. Sensor_Location.csv is provided in this repository but can be retrieved from the same page._
+
 #### Sensor.Community archive
 
 `src/sofia_lez/downloader.py` requests one source file for each unique candidate sensor and date.
@@ -66,10 +68,10 @@ transfer. It skips existing non-empty files. `download_ledger.jsonl` records eac
 cached or missing sensor-date request. A missing archive file remains missing; the code does not
 replace it with a zero concentration.
 
-Note: Running the corresponding `scripts/02_download_archive.py` to completion takes considerable time.
+Note: _Running the corresponding `scripts/02_download_archive.py` to completion takes considerable time.
 It is advised to run this script on a stable and fast internet connection. However, if the program is 
 interrupted, running `02_download_archive` will resume from the last saved file. Check research_log
-on instructions to setup a status ticker. 
+on instructions to setup a status ticker. _
 
 #### Meteorological data
 
@@ -96,14 +98,14 @@ value when the correction columns are empty.
 
 #### Sensor.Community observations
 
-The archive workflow reads SDS011 `P2` as raw PM2.5. It does not use `P1`. Timestamps are first
+The archive workflow reads SDS011 `P2` as raw PM₂.₅ It does not use `P1`. Timestamps are first
 parsed as UTC. Observations within each UTC hour are assigned to
 three twenty-minute bins: minutes 0–19, 20–39 and 40–59. The  mean of `P2` forms the
 hourly value.
 
 An archive hour passes QC when all of the following conditions are true:
 
-1. The hourly PM2.5 mean lies within 0–1000 µg/m³.
+1. The hourly PM₂.₅ mean lies within 0–1000 µg/m³.
 2. All three twenty-minute bins contain at least one observation.
 3. The value passes a temporal spike check.
 
@@ -140,7 +142,7 @@ with alternative completeness thresholds.
 
 ### 2.4 Daily aggregation
 
-`src/sofia_lez/daily.py` calculates the arithmetic mean of QC-valid hourly PM2.5 values for each
+`src/sofia_lez/daily.py` calculates the arithmetic mean of QC-valid hourly PM₂.₅ values for each
 sensor-location pair and local date. A day requires at least 18 valid hours. The table retains a
 day with fewer valid hours, but its `pm2_5` value is missing and `daily_qc_pass` is false. Missing
 values are not replaced with zero.
@@ -152,13 +154,13 @@ values are not replaced with zero.
 Sensor coordinates use WGS84 (`EPSG:4326`). The manifest attaches longitude and latitude to each
 sensor-location pair. Later tables retain both identifiers and the coordinates.
 
-Administrative-district membership provides spatial context for the LEZ. It does not define
-direct treatment. Within the nine covered districts, the restriction applies only to relevant
-buildings on streets with an operational district-heating or gas-distribution network.
+Each sensor location is assigned to a Sofia administrative district. This identifies sensors 
+located within the nine districts covered by LEZ. 
+Note: _District membership is used for spatial context. Membership does not attribute that sensor surroundings are directly affected by the LEZ. Within the nine covered districts, the restriction
+applies only to buildings on streets with an operational district-heating or gas-distribution
+network._
 
-Meteorological grids are sampled or aggregated to the sensor locations with one documented
-method. Any reprojection uses a stated coordinate reference system and resampling rule. Static
-coordinates are not used when the manifest identifies a sensor at more than one location.
+Meteorological [... filled in later]
 
 ### 3.2 Temporal harmonisation
 
@@ -178,21 +180,21 @@ period.
 
 ### 4.1 Model table
 
-The model table contains one row per accepted sensor-location pair and local date. Daily PM2.5
-is the response variable. Predictor columns contain meteorological conditions, calendar terms
-and documented spatial attributes. Only stable-panel records with `daily_qc_pass == True` enter
-the model.
+The model table contains [t.b.d.]. 
+Daily PM₂.₅ is the response variable. Predictor columns contain meteorological conditions, 
+temporal variables and sensor coordinates. Only daily observations from the stable panel 
+with `daily_qc_pass == True` enter the model.
 
-Preprocessing parameters that depend on the data are fitted on training records only. Post-LEZ
-observations do not determine scaling, imputation, feature selection or model parameters. The
-model table retains the date and sensor-location identifiers so that temporal and spatial
-dependencies remain available for validation.
+Data-dependent preprocessing and model choices are based only on pre-LEZ training data. 
+Observed post-LEZ PM₂.₅ values do not influence model development and are reserved for 
+comparison with the counterfactual predictions. Dates and sensor-location identifiers 
+are retained to support temporal and spatial validation
 
 ### 4.2 Pre-LEZ training
 
 The model is a Random Forest regressor. Training records cover 1 January 2018 through 31 December
-2024. The model learns the relationship between PM2.5 and the predictor variables under pre-LEZ
-conditions. Post-LEZ PM2.5 observations are excluded from training.
+2024. The model learns the relationship between PM₂.₅ and the predictor variables under pre-LEZ
+conditions. Post-LEZ PM₂.₅ observations are excluded from training.
 
 The model configuration records the predictor list, random seed and fitted parameters. The
 trained model is saved to `models/random_forest.joblib`.
@@ -212,15 +214,15 @@ training records.
 ### 4.4 No-LEZ baseline prediction
 
 The fitted model receives the observed meteorological, temporal and spatial predictors for the
-post-LEZ periods. It does not receive an LEZ indicator or post-LEZ PM2.5 as an input. Its output
-is the PM2.5 concentration expected if the pre-LEZ predictor-response relationship had continued.
+post-LEZ periods. It does not receive an LEZ indicator or post-LEZ PM₂.₅ as an input. Its output
+is the PM₂.₅ concentration expected if the pre-LEZ predictor-response relationship had continued.
 
 The counterfactual periods are:
 
 - 1 January–31 March 2025; and
 - 1 October 2025–31 March 2026.
 
-The prediction table retains observed PM2.5, predicted no-LEZ PM2.5, date and sensor-location
+The prediction table retains observed PM2.5, predicted no-LEZ PM₂.₅, date and sensor-location
 identifiers. This supports comparisons by date, sensor and administrative district.
 
 ## 5. Code and data reference
