@@ -195,8 +195,10 @@ are retained to support temporal validation (see 4.3).
 
 ### 4.2 Pre-LEZ training
 
-The model is a Random Forest regressor. Training records cover 1 January 2018 through 31 December
-2024. The model learns the relationship between PM₂.₅ and the predictor variables under pre-LEZ
+The model is a Random Forest regressor. Training uses observations from January–March and 
+October–December between 1 January 2018 and 31 December 2024. This restricts model fitting 
+to the heating-season months represented in the counterfactual periods. The model learns the 
+relationship between PM₂.₅ and the predictor variables under pre-LEZ
 conditions. Post-LEZ PM₂.₅ observations are excluded from training.
 
 The model configuration records the predictor list, random seed and fitted parameters. The
@@ -205,16 +207,20 @@ trained model is saved to `models/random_forest.joblib`.
 ### 4.3 Model tuning and validation
 
 Validation uses blocked time periods rather than a random split of individual sensor-days. This
-prevents neighbouring dates from appearing in both training and validation data. 
-Tuning compares candidate values for the number of trees, maximum tree depth, number of 
-candidate features and minimum leaf size.
+prevents neighbouring dates from appearing in both training and validation data. Only 
+observations from January-March and October December are included. Tuning compares candidate values
+for the number of trees, maximum tree depth, number of candidate features and minimum leaf size.
 
-**Note:** Spatial hold-out validation has been omitted for the methodology at this point. The model predicts later observations at the same stable sensor locations rather 
-than at previously unseen locations. 
+[ToDo remark: Elaborate validation design: e.g. exact train/val blocks / hyperparamter tuning 
+/ model for simple benchmark / performance: overall/SensorBySensor? / mean prediction error]
+
+**Note:** Spatial hold-out validation is omitted from the methodology at this point. The model 
+predicts later observations for the same stable sensor location pairs rather than at previously
+unseen locations. 
 
 Mean absolute error (MAE) is the primary validation measure. Root mean squared error (RMSE)
 shows sensitivity to large errors, and the coefficient of determination (R²) describes the
-explained variation. The selected parameter set is fitted again with all accepted pre-LEZ
+explained variation. The selected parameter set is fitted again using all accepted pre-LEZ
 training records.
 
 ### 4.4 No-LEZ baseline prediction
