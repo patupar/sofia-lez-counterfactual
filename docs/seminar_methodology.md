@@ -169,8 +169,8 @@ The 60% threshold is a relaxed project-specific requirement rather than a regula
 completeness standard. The combined record spans several years and originates from a voluntary
 sensor network in which interruptions and changes in availability are expected. Requiring every
 sensor-location pair to satisfy a stricter threshold in every period could substantially reduce
-the spatial coverage of the stable panel. The selected threshold balances temporal continuity
-against sensor retention.
+the spatial coverage of the stable panel. The selected threshold attempts a balance between 
+temporal continuity against sensor retention.
 
 The panel table retains all candidate pairs and records the decision in `stable_panel`. It does
 not delete pairs that fail the threshold. This permits inspection of sensor attrition and tests
