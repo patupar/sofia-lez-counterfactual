@@ -54,7 +54,7 @@ python scripts/02_download_archive.py --config configs/pipeline.yaml
 ```
 
 **Note:**
-
+Long runtime for this process > 12 hours: Keep tabs on progress by displaying Live ticker. Updates every ten seconds.
 ```bash
 ledger="$HOME/sofia-lez-counterfactual/data/raw/sensor_community/download_ledger.jsonl"
 
@@ -78,4 +78,3 @@ while true; do
 done
 ```
 
-For live ticker, updates every ten seconds.
