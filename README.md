@@ -103,7 +103,7 @@ both known Sensor.Community layouts (year-nested and root date folders) and both
 ## Documentation
 
 The full methodology, QC definitions, data contracts, limitations, and reproducibility notes
-are in [`docs/methodology.md`](docs/methodology.md). The central caveat is important:
+are in [`docs/seminar_methodology.md`](docs/seminar_methodology.md). The central caveat is important:
 Sensor.Community's 2024+ archive provides raw `P2`, not FILTER's model-based
 `corrected_pm2_5`. This code therefore never substitutes `spread` or a QC code for a corrected
 concentration and never labels raw values as corrected.
