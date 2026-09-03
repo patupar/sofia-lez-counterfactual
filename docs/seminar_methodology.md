@@ -14,7 +14,7 @@ and location had continued.
 ### 1.2 Data sources
 
 #### 1.2.1 PM2.5
-PM₂.₅ training data is derived from community-operated sensors within the study area. 
+PM₂.₅ observations are obtained from community-operated sensors within the study area. 
 
 The sensor record combines two sources:
 
@@ -27,7 +27,7 @@ Both sources provide raw PM₂.₅ observations. Empty FILTER correction fields 
 raw values are not described as corrected concentrations. `configs/pipeline.yaml` records the
 dates, paths and thresholds that control the data workflow.
 
-#### 1.2.1 Meteorological Data
+#### 1.2.2 Meteorological Data
 [Draft: Derived from ERA5 ...]
 
 
@@ -157,7 +157,8 @@ sensor-location pair. Later tables retain both identifiers and the coordinates.
 Each sensor location is assigned to a Sofia administrative district. This identifies sensors 
 located within the nine districts covered by LEZ. 
 
-**Note:** _District membership is used for spatial context. Membership does not attribute that sensor surroundings are directly affected by the LEZ. Within the nine covered districts, the restriction
+**Note:** _District membership is used for spatial context. Membership does not imply that sensor 
+surroundings are directly affected by the LEZ. Within the nine covered districts, the restriction
 applies only to buildings on streets with an operational district-heating or gas-distribution
 network._
 
@@ -189,7 +190,8 @@ with `daily_qc_pass == True` enter the model.
 Data-dependent preprocessing and model choices are based only on pre-LEZ training data. 
 Observed post-LEZ PM₂.₅ values do not influence model development and are reserved for 
 comparison with the counterfactual predictions. Dates and sensor-location identifiers 
-are retained to support temporal and spatial validation
+are retained to support temporal validation (see 4.3). 
+
 
 ### 4.2 Pre-LEZ training
 
@@ -203,9 +205,12 @@ trained model is saved to `models/random_forest.joblib`.
 ### 4.3 Model tuning and validation
 
 Validation uses blocked time periods rather than a random split of individual sensor-days. This
-prevents neighbouring dates from appearing in both training and validation data. Tuning compares
-candidate values for the number of trees, maximum tree depth, number of candidate features and
-minimum leaf size.
+prevents neighbouring dates from appearing in both training and validation data. 
+Tuning compares candidate values for the number of trees, maximum tree depth, number of 
+candidate features and minimum leaf size.
+
+**Note:** Spatial hold-out validation has been omitted for the methodology at this point. The model predicts later observations at the same stable sensor locations rather 
+than at previously unseen locations. 
 
 Mean absolute error (MAE) is the primary validation measure. Root mean squared error (RMSE)
 shows sensitivity to large errors, and the coefficient of determination (R²) describes the
@@ -229,7 +234,7 @@ identifiers. This supports comparisons by date, sensor and administrative distri
 ## 5. Anomaly assessment
 
 ## 6. Code and data reference
-The table below outlines each methodological step to its relevant script, module and resulting 
+The table below links each methodological step to its relevant script, module and resulting 
 output. 
 
 | Method | Entry point | Core module | Main output |
