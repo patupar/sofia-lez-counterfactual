@@ -19,11 +19,12 @@ Model predictions reflect expected PM2.5 concentrations in absence of the LEZ in
 
 ## Getting started
 
-Requirements: Python 3.11 or newer.
+The following setup is used on macOS. Python 3.11 or newer is required.
 
 ```bash
 git clone https://github.com/patupar/sofia-lez-counterfactual.git
 cd sofia-lez-counterfactual
+
 python -m venv .venv
 source .venv/bin/activate          
 python -m pip install -e ".[dev]"
@@ -36,77 +37,57 @@ data/raw/filter/Sensor_Location.csv
 data/raw/filter/BGR/SC<location_id>_<sensor_id>.csv
 ```
 
-The 1,958 BGR files represent **location-sensor pairs**, not necessarily 1,958 physically
-distinct stations: a sensor can appear at more than one location over time. The exact pair is
-therefore retained throughout. Review all dates, thresholds, and paths in
-[`configs/pipeline.yaml`](configs/pipeline.yaml) before the full run.
+The 1,958 BGR files represent location-sensor pairs, not necessarily 1,958 physically
+distinct stations. One sensor may have operated at more than one location over time. `location_id`
+and `sensor_id` are there retained throughout the workflow.
+Review all dates, thresholds, and paths in [`configs/pipeline.yaml`](configs/pipeline.yaml) before the full run.
 
 ## How to run
 
 Run the stages separately so every decision can be inspected:
 
 ```bash
-# 1–2: municipality manifest plus historical first/last observations
-sofia-lez --config configs/pipeline.yaml manifest
-
-# 3: 2024-01-01 through 2026-03-31 for plausible continuations
-sofia-lez --config configs/pipeline.yaml download
-
-# 4a: reconstruct and consistently QC hourly archive P2 (PM2.5)
-sofia-lez --config configs/pipeline.yaml qc-hourly
-
-# 4b: sensor-year and sensor-season/phase completeness
-sofia-lez --config configs/pipeline.yaml completeness
-
-# 5: select pairs meeting the threshold in every configured pre/post period
-sofia-lez --config configs/pipeline.yaml select-panel
-
-# 6: aggregate passing local hours to daily PM2.5
-sofia-lez --config configs/pipeline.yaml aggregate-daily
+[...]
 ```
 
 Or run the complete sequence:
 
 ```bash
-sofia-lez --config configs/pipeline.yaml run
+[...]
 ```
 
-Downloads are resumable. If the archive is already cached, use `run --skip-download`.
-Each command prints a small machine-readable JSON summary and writes a CSV output. Use
-`sofia-lez --help` or `sofia-lez COMMAND --help` for command help.
-
-## Data workflow
-
-```text
-src/sofia_lez/
-├── manifest.py       municipality filtering and historical coverage
-├── downloader.py     resumable daily archive retrieval
-├── qc.py             exact-pair extraction, hourly reconstruction, QC
-├── completeness.py   sensor-year/season metrics and stable panel
-├── daily.py          post-QC daily aggregation
-└── cli.py            stage commands and complete runner
-```
+## Workflow
 
 | Stage | Main output | Purpose |
 |---|---|---|
-| Manifest | `data/interim/sofia_sensor_manifest.csv` | Sofia polygon membership, coordinates, pair coverage, continuation flag |
-| Download | `data/raw/sensor_community/` | Immutable daily source cache |
-| Hourly QC | `data/interim/pm25_hourly_qc.csv` | Embedded hourly raw PM2.5 and transparent QC flags |
-| Completeness | `data/processed/completeness_sensor_*.csv` | Expected, observed, and valid hours/days by pair and period |
-| Panel | `data/processed/stable_panel.csv` | Threshold decision for every candidate pair |
-| Daily | `data/processed/pm25_daily.csv` | Local-date PM2.5 after hourly QC and daily coverage check |
+| Sensor manifest | `data/interim/sensors/sofia_sensor_manifest.csv` | Identify sensor-location pairs within Sofia and summarise historical coverage |
+| Archive retrieval | `data/raw/sensor_community/` | Store daily Sensor.Community source files |
+| Observation preparation | `data/interim/sensors/pm25_hourly_unified.csv` | Combine the two sensor sources and retain hourly QC results |
+| Daily aggregation | `data/processed/daily_pm25.csv` | Calculate daily PM₂.₅ from QC-valid hours |
+| Completeness assessment | `data/interim/diagnostics/completeness_sensor_year.csv` and `completeness_sensor_season.csv` | Measure sensor availability across the required periods |
+| Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
 
-The default municipality geometry is derived from SofiaPlan. The downloader tries
-both known Sensor.Community layouts (year-nested and root date folders) and both `.csv` and
-`.csv.gz` files.
+The subsequent workflow will:
+
+1. obtain and harmonise meteorological data;
+2. construct the daily model table;
+3. tune and validate the Random Forest model;
+4. train the selected model on pre-LEZ heating periods;
+5. predict the post-LEZ no-intervention baseline; and
+6. compare observed and predicted PM₂.₅ concentrations.
+[...]
 
 ## Documentation
+The repository contains two complementary records:
 
-The full methodology, QC definitions, data contracts, limitations, and reproducibility notes
-are in [`docs/seminar_methodology.md`](docs/seminar_methodology.md). The central caveat is important:
-Sensor.Community's 2024+ archive provides raw `P2`, not FILTER's model-based
-`corrected_pm2_5`. This code therefore never substitutes `spread` or a QC code for a corrected
-concentration and never labels raw values as corrected.
+- [`docs/seminar_methodology.md`](docs/seminar_methodology.md) describes the technical
+  methodology, data-processing rules and relationship between the methodological stages and the
+  code;
+- [`docs/research_log.md`](docs/research_log.md) records commands, outputs, data checks,
+  methodological decisions and problems encountered during the development of the project.
+
+The [`scripts/README.md`](scripts/README.md) lists the numbered workflow stages, while
+[`data/README.md`](data/README.md) describes the data-directory structure.
 
 ## Sample data and tests
 
@@ -125,13 +106,17 @@ push and pull request.
 
 ## Data sources
 
-- [SofiaPlan API](https://sofiaplan.bg/api/) — official Sofia municipality boundary
-- [Sensor.Community archive](https://archive.sensor.community/) — daily SDS011 observations
-- [AirBG station information](https://airbg.info/en/build-a-station/) — Bulgarian community
-  network and SDS011 context
-- Historical BGR FILTER exports and `Sensor_Location.csv` — supplied separately; not committed
+- [BGAir/FILTER dataset](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) — historical sensor observations and sensor-location information
+- [Sensor.Community archive](https://archive.sensor.community/) — daily SDS011 observations from
+  2024 onwards
+- [SofiaPlan API](https://sofiaplan.bg/api/) — Sofia Municipality boundary
+- [AirBG](https://airbg.info/en/build-a-station/) — information about Sofia’s community-operated
+  sensor network
+
+[ToDO: meteorological data sources].
 
 ## License
 
-Code is released under the [MIT License](LICENSE). Source-data licenses and attribution remain
-with their respective providers; verify them before redistribution.
+Code is released under the [MIT License](LICENSE). Source-data licences and attribution remain
+with their respective providers and must be checked before redistribution.
+
