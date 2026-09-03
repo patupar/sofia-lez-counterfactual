@@ -1,8 +1,13 @@
-# GeoML Sofia Counterfactual Paper Notebook
+# Research Log: A counterfactual assessment of Sofia's Residential Heating Low Emission Zone
 
-## Sensor Extraction
+## 1. Prelude
+This document records the development of the Sofia residential-heating LEZ counterfactual project in relation 
+to its corresponding GeoML seminar project. It documents commands run, outputs obtained, data checks, methodological decisions, problems encountered and resulting amendments to the methodology. It serves as a chronological record 
+of the research process. Unless otherwise stated, results recorded here are preliminary. 
 
-### Compute manifest on FILTER data
+## 2. Sensor Extraction
+
+### 2.1 Compute manifest on FILTER data [01.09.2026]
 
 **After running:**
 
@@ -37,11 +42,11 @@ Suggests relatively strong initial position to continue pursuing the route of us
 
 Considering 133 started reporting in 2018, and 204 before 2020, methodology could relax the 2018 date to 2020. Theoretically, four years of data should be sufficient for training.
 
-### Spatial inspection
+### 2.2 Spatial inspection [01.09.2026]
 
 [**sensor_candidate_distriubtion.pdf**](../outputs/figures/sensor_candidate_distribution.pdf)
 
-### Extract Sensor.Community archive data
+### 2.3 Extract Sensor.Community archive data [02.09.2026]
 
 Following section reads the computed `sofia_sensor_manifest.csv`, retains 423 rows marked as `plausible_continuing`, reduce these to the 420 available unique sensor IDs and requests one archive file per sensor and date.
 
