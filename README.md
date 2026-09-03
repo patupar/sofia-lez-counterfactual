@@ -2,8 +2,7 @@
 
 ## Prelude
 
-This repository holds the codebase for a seminar paper initially conceived for the Institute of Geography, Ruprecht-Karl-University Heidelberg. Goal of the work is to present a reproducible counterfactual study of Sofia, Bulgaria 
-recently introduced residential heating low emission zone (LEZ). Later versions will aim to bring this academic work to public use. Ultimately, residents of Sofia should be able to observe on a day-by-day basis whether the air quality in their neighbourhood has actually improved as a result of the LEZ intervention.   
+This repository holds the codebase for a seminar paper initially conceived for the Institute of Geography, Ruprecht-Karl-University Heidelberg. The goal of this work is to present a reproducible counterfactual study of the recently introduced residential-heating low-emission zone (LEZ) in Sofia, Bulgaria. Later versions will aim to bring this academic work to public use. Ultimately, residents of Sofia should be able to observe on a day-by-day basis whether air quality in their neighbourhood has actually improved as a result of the LEZ intervention.   
 
 ## General information: 'Counterfactual Assessment of Sofia's Residential Heating Low Emission Zone'
 On the 1 January 2025, Sofia implemented Europe’s first low-emission zone (LEZ) targeting residential heating. The
@@ -11,7 +10,7 @@ intervention prohibits the use of solid-fuels in buildings across nine districts
 knowledge, it is the first such assessment of Sofia’s residential-heating LEZ to use post-intervention
 PM2.5 measurements.
 
-Daily PM2.5 observations from BGAir’s community-operated sensor network are used, as at the point writing, Sofia's regulatory monitoring network exhibits an unsatisfactory level of spatial coverage. A secondary objective of this work is to observe whether community-operate sensor networks and volunteered geographic information as a whole, can be leveraged in the study of Sofia's urban environment and potentially inform public decision making.    
+Daily PM2.5 observations from BGAir’s community-operated sensor network are used, as at the point writing, Sofia's regulatory monitoring network exhibits spatial coverage to an unsatisfactory extend. A secondary objective that has arisen through this work is exploring whether community-operate sensor networks and volunteered geographic information as a whole, can be leveraged in the study of Sofia's urban environment and potentially inform public decision making.    
 
 Random forest models trained on pre-intervention observations from 2018–2024 predict PM2.5 concentrations during the heating
 periods between January 2025 and March 2026, accounting for meteorological and temporal variation.
