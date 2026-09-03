@@ -1,9 +1,10 @@
-# Planned Random Forest stage. This file records the MVP design but is not used
-# by the sensor-extraction scripts yet.
+# Random Forest model specification for the seminar analysis.
 training:
   start_date: "2018-01-01"
   end_date: "2024-12-31"
-  heating_months: [1, 2, 3, 10, 11, 12]
+  # Only observations from the Sofia heating-season months enter model fitting
+  # and validation.
+  include_months: [1, 2, 3, 10, 11, 12]
 
 counterfactual_periods:
   - name: "post_2025_jan_mar"
