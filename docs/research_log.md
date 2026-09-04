@@ -100,3 +100,8 @@ Further inspection shows that 115,168 missing records returned an HTTP 404 respo
 Archive availability is also reduced on several individual dates. The archive contains fewer SDS011 files on 14 and 15 March 2024 than on the surrounding dates. No SDS011 files are available for 16 March 2025, while only one is available for 17 March 2025. Upon inspection, these gaps appear to be archive-level gaps rather than a problem with the local download.
 
 File availability declines over the requested period: 73.8% of sensor-date combinations are available in 2024, 66.3% during January to March 2025 and 57.6% during October 2025 to March 2026. Nevertheless, 220 sensors provide files for at least 60% of the dates in each of these three periods. This suggests that a sufficiently large stable panel may remains available.
+
+## 3. Sensor Processing
+
+
+
