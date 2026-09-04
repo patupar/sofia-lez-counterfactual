@@ -102,7 +102,7 @@ Archive availability is also reduced on several individual dates. The archive co
 File availability declines over the requested period: 73.8% of sensor-date combinations are available in 2024, 66.3% during January to March 2025 and 57.6% during October 2025 to March 2026. Nevertheless, 220 sensors provide files for at least 60% of the dates in each of these three periods. This suggests that a sufficiently large stable panel may remains available.
 
 ## 3. Sensor Processing
-**03 script output:**
+**03 script output:** [04.09.2026]
 
 **Overall diagnostics:**
 
