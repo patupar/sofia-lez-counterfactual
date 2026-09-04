@@ -33,3 +33,6 @@ outputs/tables/**
 configs/local.yaml
 *.part
 .DS_Store
+
+# JetBrains IDE project settings
+.idea/
