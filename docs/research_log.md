@@ -60,6 +60,7 @@ python scripts/02_download_archive.py --config configs/pipeline.yaml
 
 **Note:**
 Long runtime for this process > 12 hours: Keep tabs on progress by displaying status ticker. Updates every ten seconds.
+
 ```bash
 ledger="$HOME/sofia-lez-counterfactual/data/raw/sensor_community/download_ledger.jsonl"
 
@@ -83,3 +84,19 @@ while true; do
 done
 ```
 
+**Output after completion:**
+
+```text
+Completed:  344820 / 344820 (100.0%)
+Downloaded: 229575
+Cached:     0
+Missing:    115245
+```
+
+The download finished after a runtime of more than 12 hours. The ledger contains 344,820 valid records, covering 420 sensor IDs across 821 dates. Each sensor-date combination occurs once, with no malformed or duplicate records. Of all requested files, 66.6% were downloaded and 33.4% were recorded as missing.
+
+Further inspection shows that 115,168 missing records returned an HTTP 404 response. These files were not available at the requested archive location. A further 77 requests failed because of a temporary DNS error but were also recorded as `missing`. A subsequent check against the Sensor.Community archive found that 43 of these files are available and should be retrieved separately. The remaining 34 are absent from the archive. This shows that the downloader currently does not distinguish between confirmed archive gaps and temporary connection failures.
+
+Archive availability is also reduced on several individual dates. The archive contains fewer SDS011 files on 14 and 15 March 2024 than on the surrounding dates. No SDS011 files are available for 16 March 2025, while only one is available for 17 March 2025. These dates therefore represent archive-level gaps rather than a problem with the local download.
+
+File availability declines over the requested period: 73.8% of sensor-date combinations are available in 2024, 66.3% during January to March 2025 and 57.6% during October 2025 to March 2026. Nevertheless, 220 sensors provide files for at least 60% of the dates in each of these three periods. This suggests that a sufficiently large stable panel may remain available. The final panel size can only be determined after the downloaded files have been parsed and passed through hourly and daily quality control.
