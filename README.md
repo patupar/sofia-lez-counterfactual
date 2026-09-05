@@ -62,7 +62,7 @@ Or run the complete sequence:
 | Sensor manifest | `data/interim/sensors/sofia_sensor_manifest.csv` | Identify sensor-location pairs within Sofia and summarise historical coverage |
 | Archive retrieval | `data/raw/sensor_community/` | Store daily Sensor.Community source files |
 | Observation preparation | `data/interim/sensors/pm25_hourly_unified.csv` | Combine the two sensor sources and retain hourly QC results |
-| Daily aggregation | `data/processed/daily_pm25.csv` | Calculate daily PM₂.₅ from QC-valid hours |
+| Daily aggregation | `data/processed/daily_pm25.csv` | Calculate daily PM₂.₅ and apply daily coverage and upper-bound checks |
 | Completeness assessment | `data/interim/diagnostics/completeness_sensor_year.csv` and `completeness_sensor_season.csv` | Measure sensor availability across the required periods |
 | Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
 
@@ -118,4 +118,3 @@ push and pull request.
 
 Code is released under the [MIT License](LICENSE). Source-data licences and attribution remain
 with their respective providers and must be checked before redistribution.
-
