@@ -63,7 +63,9 @@ def _read_filter_pair(path: Path, pair: pd.Series, config: dict) -> pd.DataFrame
     timezone = config["project"]["timezone"]
     frame["hour_local"] = frame["hour_utc"].dt.tz_convert(timezone)
     frame["date_local"] = frame["hour_local"].dt.date.astype(str)
-    frame = frame.loc[pd.to_datetime(frame["date_local"]).ge(study_start)].copy()
+    local_dates = pd.to_datetime(frame["date_local"])
+    filter_end = pd.Timestamp(config["project"]["filter_end_date"])
+    frame = frame.loc[local_dates.between(study_start, filter_end, inclusive="both")].copy()
     frame["sensor_id"] = int(pair["sensor_id"])
     frame["location"] = str(pair["location"])
     frame["location_id"] = int(pair["location_id"])
@@ -147,6 +149,13 @@ def build_unified_hourly(config: dict) -> pd.DataFrame:
     if duplicate.any():
         examples = hourly.loc[duplicate, ["location", "sensor_id", "hour_utc"]].head()
         raise ValueError(f"Overlapping FILTER/archive observations found:\n{examples}")
+
+    source_counts = hourly.groupby(
+        ["location_id", "sensor_id", "date_local"]
+    )["data_source"].nunique()
+    if source_counts.gt(1).any():
+        examples = source_counts.loc[source_counts.gt(1)].head()
+        raise ValueError(f"Local sensor-days combine FILTER and archive observations:\n{examples}")
 
     hourly = hourly.sort_values(["location_id", "sensor_id", "hour_utc"]).reset_index(drop=True)
     ensure_parent(config["paths"]["hourly"])

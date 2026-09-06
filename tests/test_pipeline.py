@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from sofia_lez.completeness import calculate_completeness, select_stable_panel
 from sofia_lez.config import load_config
@@ -117,6 +118,9 @@ def test_sample_pipeline(tmp_path):
     hourly = build_unified_hourly(config)
     assert len(hourly) == 3
     assert set(hourly["data_source"]) == {"filter", "sensor_community"}
+    assert not hourly.groupby(
+        ["location_id", "sensor_id", "date_local"]
+    )["data_source"].nunique().gt(1).any()
     historical = hourly.loc[hourly["data_source"].eq("filter")].reset_index(drop=True)
     archive = hourly.loc[hourly["data_source"].eq("sensor_community")].reset_index(drop=True)
     assert list(historical["pm2_5"]) == [20.0, 22.0]
@@ -136,4 +140,48 @@ def test_sample_pipeline(tmp_path):
     assert len(daily) == 2
     assert list(daily["pm2_5"]) == [20.0, 21.0]
     assert list(daily["observed_hours"]) == [2, 1]
+    assert daily["qc_daily_hours"].all()
+    assert daily["qc_daily_range"].all()
     assert daily["daily_qc_pass"].all()
+
+
+def test_daily_aggregation_applies_exclusive_upper_bound(tmp_path):
+    hours = pd.date_range("2024-01-01", periods=18, freq="h", tz="UTC")
+    rows = []
+    for sensor_id, value in ((1, 249.9), (2, 250.0), (3, 999.9)):
+        rows.extend(
+            {
+                "hour_local": hour,
+                "location": f"SC{sensor_id}",
+                "location_id": sensor_id,
+                "sensor_id": sensor_id,
+                "lat": 42.7,
+                "lon": 23.3,
+                "pm2_5": value,
+                "qc_pass": True,
+                "data_source": "sensor_community",
+            }
+            for hour in hours
+        )
+    hourly_path = tmp_path / "hourly.csv"
+    daily_path = tmp_path / "daily.csv"
+    pd.DataFrame(rows).to_csv(hourly_path, index=False)
+    config = {
+        "project": {"timezone": "Europe/Sofia"},
+        "paths": {"hourly": hourly_path, "daily": daily_path},
+        "aggregation": {
+            "minimum_valid_hours_per_day": 18,
+            "maximum_daily_pm25_exclusive": 250.0,
+        },
+    }
+
+    daily = aggregate_daily(config).set_index("sensor_id")
+
+    assert daily.loc[1, "pm2_5"] == pytest.approx(249.9)
+    assert bool(daily.loc[1, "daily_qc_pass"])
+    assert pd.isna(daily.loc[2, "pm2_5"])
+    assert pd.isna(daily.loc[3, "pm2_5"])
+    assert daily.loc[2, "pm2_5_before_daily_qc"] == 250.0
+    assert daily.loc[3, "pm2_5_before_daily_qc"] == pytest.approx(999.9)
+    assert not bool(daily.loc[2, "qc_daily_range"])
+    assert not bool(daily.loc[3, "qc_daily_range"])

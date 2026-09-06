@@ -63,6 +63,9 @@ qc:
 
 aggregation:
   minimum_valid_hours_per_day: 18
+  # Project-specific analytical safeguard applied to daily means. The upper
+  # boundary is exclusive: values equal to or above 250 ug/m3 are flagged.
+  maximum_daily_pm25_exclusive: 250.0
 
 completeness:
   minimum_valid_hours_per_day: 18

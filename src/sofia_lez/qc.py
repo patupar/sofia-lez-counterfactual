@@ -125,11 +125,12 @@ def build_archive_hourly(config: dict) -> pd.DataFrame:
         ["location_id", "sensor_id", "hour_utc"], keep="last"
     )
 
-    archive_start = pd.Timestamp(config["project"]["archive_start_date"], tz="UTC")
+    archive_start = pd.Timestamp(config["project"]["archive_start_date"])
     project_end = pd.Timestamp(config["project"]["end_date"]).date()
+    local_dates = hourly["hour_local"].dt.date
     hourly = hourly.loc[
-        hourly["hour_utc"].ge(archive_start)
-        & hourly["hour_local"].dt.date.le(project_end)
+        local_dates.ge(archive_start.date())
+        & local_dates.le(project_end)
     ].copy()
     if hourly.empty:
         raise ValueError("Archive files were found, but none fall inside the configured dates")

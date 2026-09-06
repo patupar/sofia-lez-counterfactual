@@ -55,6 +55,7 @@ qc:
 
 aggregation:
   minimum_valid_hours_per_day: 1
+  maximum_daily_pm25_exclusive: 250.0
 
 completeness:
   minimum_valid_hours_per_day: 1

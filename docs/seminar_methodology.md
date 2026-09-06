@@ -181,9 +181,16 @@ with alternative completeness thresholds.
 `src/sofia_lez/daily.py` calculates the arithmetic mean of QC-valid hourly PM₂.₅ values for each
 sensor-location pair and local date. A day requires at least 18 valid hours, corresponding to 75%
 coverage of a 24-hour day. This completeness criterion has precedent in published PM₂.₅ analyses
-using low-cost sensor observations (Dhammapala et al., 2022). The table retains a day with fewer
-valid hours, but its `pm2_5` value is missing and `daily_qc_pass` is false. Missing values are not
-replaced with zero.
+using low-cost sensor observations (Dhammapala et al., 2022).
+
+As a project-specific analytical safeguard, daily means equal to or above 250 µg/m³ are excluded
+from the analysis. This deliberately simple threshold is applied after daily aggregation rather
+than to individual hours. It therefore does not replace the hourly 0–1000 µg/m³ operating-range
+check or remove short high-concentration episodes that produce a daily mean below 250 µg/m³.
+
+The table retains the calculated mean in `pm2_5_before_daily_qc` for inspection. Its analytical
+`pm2_5` value is missing and `daily_qc_pass` is false when the day contains fewer than 18 valid
+hours or its mean is at least 250 µg/m³. Missing values are not replaced with zero.
 
 ## 3. Spatial and temporal harmonisation
 
@@ -209,8 +216,10 @@ avoid ambiguous timestamps during daylight-saving transitions. Daily aggregation
 use Sofia local dates.
 
 The FILTER record ends on 31 December 2023, and the Sensor.Community record starts on 1 January
-2024. The code rejects overlapping hourly records for the same sensor-location pair. The final
-study date is evaluated in Sofia local time.
+2024. Both boundaries are applied to Sofia local dates. This prevents hours from the two sources
+being combined within the same local sensor-day around the source transition. The code also
+rejects overlapping hourly records for the same sensor-location pair. The final study date is
+evaluated in Sofia local time.
 
 Meteorological timestamps use the same hourly or daily index before they are joined to sensor
 observations. Temporal aggregation uses only information from the corresponding observation
