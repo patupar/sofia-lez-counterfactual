@@ -70,9 +70,9 @@ COMMANDS: dict[str, Callable[[dict], dict]] = {
     "manifest": _manifest,
     "download": _download,
     "qc-hourly": _qc,
+    "aggregate-daily": _daily,
     "completeness": _completeness,
     "select-panel": _panel,
-    "aggregate-daily": _daily,
 }
 
 
@@ -89,7 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
             "download": "download 2024–2026 archive files for plausible continuing sensors",
             "qc-hourly": "combine FILTER and archive hours with documented source-specific QC",
             "completeness": "calculate sensor-year and sensor-season completeness",
-            "select-panel": "choose pairs complete in every configured pre/post period",
+            "select-panel": "choose pairs complete across the configured pre/post periods",
             "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
         }[command])
     run = subparsers.add_parser("run", help="run the implemented data-preparation sequence")

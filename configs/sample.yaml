@@ -57,8 +57,9 @@ aggregation:
   minimum_valid_hours_per_day: 1
   maximum_daily_pm25_exclusive: 250.0
 
-completeness:
-  minimum_valid_hours_per_day: 1
-  panel_minimum_hour_fraction: 0.01
-  panel_periods:
+panel_selection:
+  minimum_day_fraction: 0.01
+  pre_start_year: 2024
+  pre_end_year: 2024
+  post_periods:
     sample_period: ["2024-01-01", "2024-01-01"]

@@ -67,12 +67,15 @@ aggregation:
   # boundary is exclusive: values equal to or above 250 ug/m3 are flagged.
   maximum_daily_pm25_exclusive: 250.0
 
-completeness:
-  minimum_valid_hours_per_day: 18
-  panel_minimum_hour_fraction: 0.60
-  panel_periods:
-    pre_2024_jan_mar: ["2024-01-01", "2024-03-31"]
-    pre_2024_oct_dec: ["2024-10-01", "2024-12-31"]
+panel_selection:
+  # Daily validity is taken from the Stage 3 daily output, including its
+  # minimum-hours and <250 ug/m3 requirements.
+  # Deliberately relaxed project threshold for the voluntary sensor network.
+  minimum_day_fraction: 0.60
+  # Pre-LEZ completeness is pooled across these complete calendar years.
+  pre_start_year: 2018
+  pre_end_year: 2024
+  # Each post-LEZ evaluation window must independently meet the threshold.
+  post_periods:
     post_2025_jan_mar: ["2025-01-01", "2025-03-31"]
-    post_2025_oct_dec: ["2025-10-01", "2025-12-31"]
-    post_2026_jan_mar: ["2026-01-01", "2026-03-31"]
+    post_2025_oct_mar: ["2025-10-01", "2026-03-31"]

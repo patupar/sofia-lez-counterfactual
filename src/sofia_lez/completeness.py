@@ -1,4 +1,4 @@
-"""Sensor-year and heating-period completeness metrics."""
+"""Sensor completeness metrics and stable-panel selection."""
 
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ def _clip_period(
 
 def _period_metrics(
     hourly: pd.DataFrame,
+    daily: pd.DataFrame,
     periods: Iterable[tuple[str, pd.Timestamp, pd.Timestamp]],
     timezone: str,
-    minimum_daily_hours: int,
     name_column: str,
 ) -> pd.DataFrame:
     pair_columns = ["location", "location_id", "sensor_id", "lat", "lon"]
@@ -44,6 +44,7 @@ def _period_metrics(
         subset = hourly.loc[
             hourly["hour_local"].ge(start_local) & hourly["hour_local"].lt(end_exclusive)
         ].copy()
+        daily_subset = daily.loc[daily["date"].between(start, end)].copy()
         expected = _expected_hours(start, end, timezone)
         expected_days = (end.date() - start.date()).days + 1
         for pair in pairs.itertuples(index=False):
@@ -51,8 +52,12 @@ def _period_metrics(
                 subset["location_id"].eq(pair.location_id) & subset["sensor_id"].eq(pair.sensor_id)
             ]
             valid = selected.loc[selected["qc_pass"]]
-            daily_counts = valid.groupby(valid["hour_local"].dt.date).size()
+            selected_days = daily_subset.loc[
+                daily_subset["location_id"].eq(pair.location_id)
+                & daily_subset["sensor_id"].eq(pair.sensor_id)
+            ]
             valid_hours = int(len(valid))
+            valid_days = int(selected_days["daily_qc_pass"].sum())
             rows.append(
                 {
                     **pair._asdict(),
@@ -64,9 +69,8 @@ def _period_metrics(
                     "valid_hours": valid_hours,
                     "hour_completeness": valid_hours / expected if expected else 0.0,
                     "expected_days": expected_days,
-                    "valid_days": int(daily_counts.ge(minimum_daily_hours).sum()),
-                    "day_completeness": int(daily_counts.ge(minimum_daily_hours).sum())
-                    / expected_days,
+                    "valid_days": valid_days,
+                    "day_completeness": valid_days / expected_days,
                 }
             )
     return pd.DataFrame(rows)
@@ -88,10 +92,12 @@ def calculate_completeness(config: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         config["project"]["timezone"]
     )
     hourly["qc_pass"] = hourly["qc_pass"].astype(str).str.lower().eq("true")
+    daily = pd.read_csv(config["paths"]["daily"], low_memory=False)
+    daily["date"] = pd.to_datetime(daily["date"])
+    daily["daily_qc_pass"] = daily["daily_qc_pass"].astype(str).str.lower().eq("true")
     project_start = pd.Timestamp(config["project"]["study_start_date"])
     project_end = pd.Timestamp(config["project"]["end_date"])
     timezone = config["project"]["timezone"]
-    minimum = int(config["completeness"]["minimum_valid_hours_per_day"])
 
     years = []
     for year in range(project_start.year, project_end.year + 1):
@@ -103,18 +109,18 @@ def calculate_completeness(config: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         )
         if clipped:
             years.append((str(year), *clipped))
-    year_table = _period_metrics(hourly, years, timezone, minimum, "year")
+    year_table = _period_metrics(hourly, daily, years, timezone, "year")
 
     seasons = list(_heating_seasons(project_start, project_end))
-    panel_periods = [
+    selection_periods = [
         (name, *_clip_period(start, end, project_start, project_end))
-        for name, (start, end) in config["completeness"]["panel_periods"].items()
+        for name, (start, end) in config["panel_selection"]["post_periods"].items()
         if _clip_period(start, end, project_start, project_end)
     ]
     season_table = pd.concat(
         [
-            _period_metrics(hourly, seasons, timezone, minimum, "season"),
-            _period_metrics(hourly, panel_periods, timezone, minimum, "season"),
+            _period_metrics(hourly, daily, seasons, timezone, "season"),
+            _period_metrics(hourly, daily, selection_periods, timezone, "season"),
         ],
         ignore_index=True,
     )
@@ -130,21 +136,65 @@ def calculate_completeness(config: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def select_stable_panel(config: dict) -> pd.DataFrame:
-    """Require the configured completeness threshold in every pre/post panel period."""
+    """Select pairs complete across the aggregate pre period and each post period."""
+    years = pd.read_csv(config["paths"]["completeness_year"])
     seasons = pd.read_csv(config["paths"]["completeness_season"])
-    required = list(config["completeness"]["panel_periods"])
-    threshold = float(config["completeness"]["panel_minimum_hour_fraction"])
-    panel_periods = seasons.loc[seasons["season"].isin(required)].copy()
-    panel_periods["passes"] = panel_periods["hour_completeness"].ge(threshold)
     index = ["location", "location_id", "sensor_id", "lat", "lon"]
-    wide = panel_periods.pivot_table(
-        index=index, columns="season", values="hour_completeness", aggfunc="first"
-    ).reset_index()
-    pass_counts = panel_periods.groupby(index)["passes"].agg(["sum", "count"]).reset_index()
-    panel = wide.merge(pass_counts, on=index, how="left")
-    panel["required_periods"] = len(required)
-    panel["stable_panel"] = panel["sum"].eq(len(required)) & panel["count"].eq(len(required))
-    panel = panel.rename(columns={"sum": "periods_passing", "count": "periods_observed"})
+    settings = config["panel_selection"]
+    threshold = float(settings["minimum_day_fraction"])
+    pre_start_year = int(settings["pre_start_year"])
+    pre_end_year = int(settings["pre_end_year"])
+    post_periods = list(settings["post_periods"])
+
+    pre = years.loc[years["year"].between(pre_start_year, pre_end_year)].copy()
+    expected_pre_years = set(range(pre_start_year, pre_end_year + 1))
+    observed_pre_years = set(pre["year"].unique())
+    if observed_pre_years != expected_pre_years:
+        missing = sorted(expected_pre_years - observed_pre_years)
+        raise ValueError(f"Completeness table is missing configured pre-LEZ years: {missing}")
+
+    pre_summary = (
+        pre.groupby(index, as_index=False)
+        .agg(
+            pre_expected_days=("expected_days", "sum"),
+            pre_valid_days=("valid_days", "sum"),
+        )
+    )
+    pre_summary["pre_day_completeness"] = (
+        pre_summary["pre_valid_days"] / pre_summary["pre_expected_days"]
+    )
+    pre_summary["passes_pre"] = pre_summary["pre_day_completeness"].ge(threshold)
+
+    post = seasons.loc[seasons["season"].isin(post_periods)].copy()
+    observed_post_periods = set(post["season"].unique())
+    missing_post_periods = sorted(set(post_periods) - observed_post_periods)
+    if missing_post_periods:
+        raise ValueError(
+            "Completeness table is missing configured post-LEZ periods: "
+            f"{missing_post_periods}"
+        )
+    if post.duplicated(index + ["season"]).any():
+        raise ValueError("Completeness table contains duplicate sensor-period rows")
+
+    panel = pre_summary
+    for period in post_periods:
+        columns = index + ["expected_days", "valid_days", "day_completeness"]
+        period_table = post.loc[post["season"].eq(period), columns].rename(
+            columns={
+                "expected_days": f"{period}_expected_days",
+                "valid_days": f"{period}_valid_days",
+                "day_completeness": f"{period}_day_completeness",
+            }
+        )
+        period_table[f"passes_{period}"] = period_table[
+            f"{period}_day_completeness"
+        ].ge(threshold)
+        panel = panel.merge(period_table, on=index, how="left", validate="one_to_one")
+
+    pass_columns = ["passes_pre", *(f"passes_{period}" for period in post_periods)]
+    panel["criteria_passing"] = panel[pass_columns].fillna(False).sum(axis=1)
+    panel["required_criteria"] = len(pass_columns)
+    panel["stable_panel"] = panel[pass_columns].fillna(False).all(axis=1)
     ensure_parent(config["paths"]["panel"])
     panel.to_csv(config["paths"]["panel"], index=False)
     return panel

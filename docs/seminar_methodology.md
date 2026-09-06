@@ -152,18 +152,18 @@ hour instead of presenting the two QC procedures as identical.
 
 `src/sofia_lez/completeness.py` calculates completeness for each sensor-location pair. Expected
 hours are generated in `Europe/Sofia` time so that daylight-saving transitions are counted
-correctly. The output reports observed hours, QC-valid hours, valid days and the corresponding
+correctly. Hour completeness is based on the hourly QC table. Day completeness is based on the
+daily QC table and therefore includes both the 18-hour requirement and the daily PM2.5 upper-bound
+check. The output reports observed hours, QC-valid hours, valid days and the corresponding
 fractions for each sensor-year and heating period.
 
-The stable-panel rule requires at least 60% of expected hours in every configured period:
+The stable-panel rule requires at least 60% of expected days in each of three criteria:
 
-| Role | Period |
-|---|---|
-| Pre-LEZ | 1 January–31 March 2024 |
-| Pre-LEZ | 1 October–31 December 2024 |
-| Post-LEZ | 1 January–31 March 2025 |
-| Post-LEZ | 1 October–31 December 2025 |
-| Post-LEZ | 1 January–31 March 2026 |
+| Criterion | Period | Calculation |
+|---|---|---|
+| Pre-LEZ | 1 January 2018–31 December 2024 | valid days pooled across all seven years |
+| Post-LEZ 1 | 1 January–31 March 2025 | valid days within the evaluation window |
+| Post-LEZ 2 | 1 October 2025–31 March 2026 | valid days within the evaluation window |
 
 The 60% threshold is a relaxed project-specific requirement rather than a regulatory
 completeness standard. The combined record spans several years and originates from a voluntary
@@ -172,9 +172,11 @@ sensor-location pair to satisfy a stricter threshold in every period could subst
 the spatial coverage of the stable panel. The selected threshold attempts a balance between 
 temporal continuity against sensor retention.
 
-The panel table retains all candidate pairs and records the decision in `stable_panel`. It does
-not delete pairs that fail the threshold. This permits inspection of sensor attrition and tests
-with alternative completeness thresholds.
+`scripts/05_select_stable_panel.py` applies these criteria to the Stage 4 completeness tables.
+The panel table retains all candidate pairs, the numerator, denominator, completeness and pass
+flag for every criterion, and the combined decision in `stable_panel`. It does not delete pairs
+that fail the threshold. This permits inspection of sensor attrition and tests with alternative
+completeness thresholds.
 
 ### 2.4 Daily aggregation
 
@@ -296,7 +298,7 @@ output.
 | Retrieve archive | `scripts/02_download_archive.py` | `downloader.py` | `data/raw/sensor_community/` and `download_ledger.jsonl` |
 | Prepare hourly and daily observations | `scripts/03_prepare_sensor_observations.py` | `sensors.py`, `qc.py`, `daily.py` | Unified hourly and daily PM2.5 tables |
 | Calculate completeness | `scripts/04_check_sensor_completeness.py` | `completeness.py` | Sensor-year and sensor-season tables |
-| Select stable panel | `sofia-lez select-panel` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
+| Select stable panel | `scripts/05_select_stable_panel.py` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
 
 All entry points read `configs/pipeline.yaml`. `pyproject.toml` defines the Python dependencies.
 `sample_data/` contains synthetic data for `tests/test_pipeline.py` where  spatial filter, archive

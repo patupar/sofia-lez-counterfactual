@@ -129,13 +129,6 @@ def test_sample_pipeline(tmp_path):
     assert int(archive.loc[0, "spread"]) == 3
     assert bool(archive.loc[0, "qc_pass"])
 
-    years, seasons = calculate_completeness(config)
-    assert years["valid_hours"].sum() == 2
-    assert "sample_period" in set(seasons["season"])
-
-    panel = select_stable_panel(config)
-    assert bool(panel.loc[0, "stable_panel"])
-
     daily = aggregate_daily(config)
     assert len(daily) == 2
     assert list(daily["pm2_5"]) == [20.0, 21.0]
@@ -143,6 +136,13 @@ def test_sample_pipeline(tmp_path):
     assert daily["qc_daily_hours"].all()
     assert daily["qc_daily_range"].all()
     assert daily["daily_qc_pass"].all()
+
+    years, seasons = calculate_completeness(config)
+    assert years["valid_hours"].sum() == 2
+    assert "sample_period" in set(seasons["season"])
+
+    panel = select_stable_panel(config)
+    assert bool(panel.loc[0, "stable_panel"])
 
 
 def test_daily_aggregation_applies_exclusive_upper_bound(tmp_path):
@@ -165,13 +165,27 @@ def test_daily_aggregation_applies_exclusive_upper_bound(tmp_path):
         )
     hourly_path = tmp_path / "hourly.csv"
     daily_path = tmp_path / "daily.csv"
+    year_path = tmp_path / "year.csv"
+    season_path = tmp_path / "season.csv"
     pd.DataFrame(rows).to_csv(hourly_path, index=False)
     config = {
-        "project": {"timezone": "Europe/Sofia"},
-        "paths": {"hourly": hourly_path, "daily": daily_path},
+        "project": {
+            "timezone": "Europe/Sofia",
+            "study_start_date": "2024-01-01",
+            "end_date": "2024-01-01",
+        },
+        "paths": {
+            "hourly": hourly_path,
+            "daily": daily_path,
+            "completeness_year": year_path,
+            "completeness_season": season_path,
+        },
         "aggregation": {
             "minimum_valid_hours_per_day": 18,
             "maximum_daily_pm25_exclusive": 250.0,
+        },
+        "panel_selection": {
+            "post_periods": {"sample_period": ["2024-01-01", "2024-01-01"]},
         },
     }
 
@@ -185,3 +199,76 @@ def test_daily_aggregation_applies_exclusive_upper_bound(tmp_path):
     assert daily.loc[3, "pm2_5_before_daily_qc"] == pytest.approx(999.9)
     assert not bool(daily.loc[2, "qc_daily_range"])
     assert not bool(daily.loc[3, "qc_daily_range"])
+
+    years, _ = calculate_completeness(config)
+    valid_days = years.set_index("sensor_id")["valid_days"]
+    assert valid_days.to_dict() == {1: 1, 2: 0, 3: 0}
+
+
+def test_select_stable_panel_uses_aggregate_pre_and_each_post_period(tmp_path):
+    index_values = {
+        "location": ["SC1", "SC2"],
+        "location_id": [1, 2],
+        "sensor_id": [11, 22],
+        "lat": [42.70, 42.71],
+        "lon": [23.30, 23.31],
+    }
+    year_rows = []
+    for position in range(2):
+        pair = {column: values[position] for column, values in index_values.items()}
+        for year, valid_days in ((2023, (40, 80)[position]), (2024, (100, 80)[position])):
+            year_rows.append(
+                {
+                    **pair,
+                    "year": year,
+                    "expected_days": 100,
+                    "valid_days": valid_days,
+                }
+            )
+
+    season_rows = []
+    post_completeness = {
+        11: {"post_one": 0.70, "post_two": 0.80},
+        22: {"post_one": 0.80, "post_two": 0.59},
+    }
+    for position in range(2):
+        pair = {column: values[position] for column, values in index_values.items()}
+        for period, completeness in post_completeness[pair["sensor_id"]].items():
+            season_rows.append(
+                {
+                    **pair,
+                    "season": period,
+                    "expected_days": 100,
+                    "valid_days": int(completeness * 100),
+                    "day_completeness": completeness,
+                }
+            )
+
+    year_path = tmp_path / "year.csv"
+    season_path = tmp_path / "season.csv"
+    panel_path = tmp_path / "panel.csv"
+    pd.DataFrame(year_rows).to_csv(year_path, index=False)
+    pd.DataFrame(season_rows).to_csv(season_path, index=False)
+    config = {
+        "paths": {
+            "completeness_year": year_path,
+            "completeness_season": season_path,
+            "panel": panel_path,
+        },
+        "panel_selection": {
+            "minimum_day_fraction": 0.60,
+            "pre_start_year": 2023,
+            "pre_end_year": 2024,
+            "post_periods": {
+                "post_one": ["2025-01-01", "2025-03-31"],
+                "post_two": ["2025-10-01", "2026-03-31"],
+            },
+        },
+    }
+
+    panel = select_stable_panel(config).set_index("sensor_id")
+
+    assert panel.loc[11, "pre_day_completeness"] == pytest.approx(0.70)
+    assert bool(panel.loc[11, "stable_panel"])
+    assert not bool(panel.loc[22, "stable_panel"])
+    assert panel_path.exists()
