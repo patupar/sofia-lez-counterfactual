@@ -102,6 +102,8 @@ Archive availability is also reduced on several individual dates. The archive co
 File availability declines over the requested period: 73.8% of sensor-date combinations are available in 2024, 66.3% during January to March 2025 and 57.6% during October 2025 to March 2026. Nevertheless, 220 sensors provide files for at least 60% of the dates in each of these three periods. This suggests that a sufficiently large stable panel may remains available.
 
 ## 3. Sensor Processing
+
+### 3.1 Outputs and discussion on preparing sensor observations
 **03 script output:** [04.09.2026]
 
 **Overall diagnostics:**
@@ -279,5 +281,10 @@ Twenty highest valid daily observations:
 ```
 
 Inspection of the results fortunately report a low extreme value count. However, 696 records are equal or above 250µg/m³ which most likely is not plausible for the Sofia context. Furthermore repeated values of exactly 999.9µg/m³ from individual Sensor.Community sensors, including during the summer do not resemble genuine pollution episodes. Instead, corresponding to the upper measurement range of the SDS011 sensor and QC check -> likely indicates sensor saturation or malfunction. These observations should be omitted before moving on. In the context of this project, measurements ≥ 250 µg/m³ will be left out.
+
+**Second run 03** [05.09.2026]
+After second run, no sensor-day combines FILTER and Sensor.Community data. All daily means ≥ 250 µg/m³ are removed. 621,884 daily observations remain available. 
+
+### 3.2 Output and discussion on sensor completeness
 
 
