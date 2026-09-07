@@ -10,7 +10,7 @@ counterfactual_periods:
   - name: "post_2025_jan_mar"
     start_date: "2025-01-01"
     end_date: "2025-03-31"
-  - name: "post_2025_2026_heating"
+  - name: "post_2025_oct_mar"
     start_date: "2025-10-01"
     end_date: "2026-03-31"
 

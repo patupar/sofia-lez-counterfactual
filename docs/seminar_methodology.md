@@ -51,7 +51,8 @@ sensor can occur at different locations.
 
 The manifest marks a pair as `plausible_continuing` when its last raw observation occurs on or
 after 1 October 2023. This flag limits archive requests. It is not the final rule for analytical
-inclusion. The completeness assessment `scripts/04_check_sensor_completeness.py` defines the final sensor panel.
+inclusion. The completeness assessment provides the inputs for the final panel selection performed
+by `scripts/05_select_stable_panel.py`.
 
 **Note:** _BGAir/FILTER records are retrieved from this [link](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) under BGR.zip. Sensor_Location.csv is provided in this repository but can be retrieved from the same page._
 
