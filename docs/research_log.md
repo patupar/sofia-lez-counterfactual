@@ -350,25 +350,3 @@ Most sensor-location pairs are concentrated in the central, western and southern
 Although the observed distribution, at least one sensor-location pair exist per LEZ district. No changes to sensor pre-processing will be taken. Remains however important to take note of in later interpretation, in combination with further validation and spatial diagnostics. 
 
 ## 4. Meteorological Data
-
-### 4.1 First ERA5 retrieval attempt [07.09.2026]
-
-The first request made by `scripts/06_download_era5.py` covered December 2017, which provides the
-buffer required before the study starts on 1 January 2018. CDS accepted and completed the request
-in approximately six minutes. Local validation nevertheless rejected the downloaded response as
-it was not a single readable NetCDF file.
-
-The successful CDS status confirms that the credentials and dataset licence were accepted. The
-failure is consistent with the current CDS NetCDF converter, which separates variables with
-different GRIB step types. A request combining instantaneous variables and accumulated total
-precipitation can therefore be returned as a ZIP archive containing separate NetCDF files, despite
-specifying an unarchived download. This behaviour is documented in the
-[ECMWF user forum](https://forum.ecmwf.int/t/cdsapi-reanalysis-single-level-is-being-download-as-a-zip-when-asked-for-unarchived/10172).
-
-Stage 6 was revised to detect the ZIP response, safely combine its NetCDF members and validate all
-seven variables and every requested UTC hour. The retained 2017 `.part` response can be recovered
-on the next run without submitting the same request again. Direct NetCDF responses remain
-supported. The successful retrieval outputs and data checks will be recorded after the revised
-workflow has completed.
-
-
