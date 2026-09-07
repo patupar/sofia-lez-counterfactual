@@ -343,7 +343,11 @@ Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of 
 
 Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
 
+[**Spatial distribution of stable panel sensors**](outputs/figures/stable_panel_sensors.pdf) 
 
+Most sensor-location pairs are concentrated in the central, western and southern districts, with observations located both within and outside the nine districts covered by the residential-heating LEZ. The northern and outer parts of the municipality remain sparsely represented. The panel therefore captures different parts of Sofia's urban area, but cannot be considered spatially representative of the municipality as a whole. Within the districts covered by the LEZ, the retained sensor-location pairs are also unevenly distributed. They appear more concentrated in the southwestern and southern districts, while the northern LEZ districts contain fewer locations.
+
+Although the observed distribution, at least one sensor-location pair exist per LEZ district. No changes to sensor pre-processing will be taken. Remains however important to take note of in later interpretation, in combination with further validation and spatial diagnostics. 
 
 
 
