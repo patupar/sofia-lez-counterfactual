@@ -26,5 +26,7 @@ python scripts/01_build_sensor_manifest.py --config configs/pipeline.yaml
 
 The future filenames document the intended order; empty placeholder Python files are not used.
 
-`06_download_era5.py` requires external CDS credentials. Tests and the synthetic sample workflow
-do not contact CDS.
+`06_download_era5.py` requires external CDS credentials. The script accepts both a direct NetCDF
+response and the split instantaneous/accumulated ZIP response currently returned for the selected
+variables. Retained responses and completed annual files are reused. Tests and the synthetic
+sample workflow do not contact CDS.

@@ -5,9 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import shutil
+import tempfile
 import threading
 import time
+import zipfile
 from collections.abc import Iterable
+from contextlib import ExitStack
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -146,32 +150,168 @@ def _collapse_expver(array: xr.DataArray) -> xr.DataArray:
     return combined
 
 
-def _normalise_dataset(dataset: xr.Dataset, configured_variables: Iterable[str]) -> xr.Dataset:
+def _normalise_dataset(
+    dataset: xr.Dataset,
+    configured_variables: Iterable[str],
+    *,
+    require_all: bool = True,
+) -> xr.Dataset:
     """Return the configured variables under stable ERA5 short names."""
     arrays = {}
+    missing = []
     for cds_name in configured_variables:
-        arrays[ERA5_SHORT_NAMES[cds_name]] = _collapse_expver(
-            dataset[_find_variable(dataset, cds_name)]
-        )
+        try:
+            source_name = _find_variable(dataset, cds_name)
+        except ValueError:
+            missing.append(cds_name)
+            continue
+        arrays[ERA5_SHORT_NAMES[cds_name]] = _collapse_expver(dataset[source_name])
+    if missing and require_all:
+        raise ValueError(f"ERA5 file is missing configured variables: {missing}")
+    if not arrays:
+        raise ValueError("ERA5 file contains none of the configured variables")
     normalised = xr.Dataset(arrays)
     time_name = _find_time_name(normalised)
     if time_name != "time":
+        if "time" in normalised.coords and "time" not in normalised.dims:
+            normalised = normalised.drop_vars("time")
         normalised = normalised.rename({time_name: "time"})
     for coordinate in ("latitude", "longitude"):
         if coordinate not in normalised.coords:
             raise ValueError(f"ERA5 file is missing coordinate '{coordinate}'")
+    nuisance_coordinates = [
+        name
+        for name in normalised.coords
+        if name not in {"time", "latitude", "longitude"} and name not in normalised.dims
+    ]
+    if nuisance_coordinates:
+        normalised = normalised.drop_vars(nuisance_coordinates)
     return normalised
 
 
-def _valid_era5_file(path: Path, configured_variables: Iterable[str]) -> bool:
-    if not path.exists() or path.stat().st_size == 0:
-        return False
+def _expected_request_times(request: dict[str, Any]) -> pd.DatetimeIndex:
+    """Return all valid UTC hours represented by one annual CDS request."""
+    ranges = []
+    year = int(request["year"][0])
+    requested_days = {int(value) for value in request["day"]}
+    requested_hours = {int(value.split(":")[0]) for value in request["time"]}
+    for month_text in request["month"]:
+        month = int(month_text)
+        start = pd.Timestamp(year=year, month=month, day=1, tz="UTC")
+        end = start + pd.offsets.MonthBegin(1)
+        hours = pd.date_range(start, end, freq="h", inclusive="left")
+        ranges.append(hours[hours.day.isin(requested_days) & hours.hour.isin(requested_hours)])
+    if not ranges:
+        return pd.DatetimeIndex([], tz="UTC")
+    return ranges[0].append(ranges[1:])
+
+
+def _validate_era5_file(
+    path: Path,
+    configured_variables: Iterable[str],
+    request: dict[str, Any] | None = None,
+) -> None:
+    """Raise a useful error when a cached or downloaded ERA5 file is unsuitable."""
+    if not path.exists():
+        raise ValueError(f"file does not exist: {path}")
+    if path.stat().st_size == 0:
+        raise ValueError(f"file is empty: {path}")
+    if zipfile.is_zipfile(path):
+        raise ValueError("CDS returned a ZIP archive that has not yet been normalised")
     try:
         with xr.open_dataset(path, engine="netcdf4") as dataset:
             normalised = _normalise_dataset(dataset, configured_variables)
-            return normalised.sizes.get("time", 0) > 0
-    except (OSError, ValueError):
+            if normalised.sizes.get("time", 0) == 0:
+                raise ValueError("ERA5 file has an empty time coordinate")
+            for coordinate in ("latitude", "longitude"):
+                if normalised.sizes.get(coordinate, 0) == 0:
+                    raise ValueError(f"ERA5 file has an empty {coordinate} coordinate")
+            times = pd.DatetimeIndex(pd.to_datetime(normalised["time"].values, utc=True))
+            if times.has_duplicates:
+                raise ValueError("ERA5 file contains duplicate timestamps")
+            if not times.is_monotonic_increasing:
+                raise ValueError("ERA5 timestamps are not in increasing order")
+            if request is not None:
+                expected = _expected_request_times(request)
+                missing = expected.difference(times)
+                if len(missing):
+                    preview = [str(value) for value in missing[:5]]
+                    raise ValueError(
+                        f"ERA5 file is missing {len(missing)} requested UTC hours; "
+                        f"first missing: {preview}"
+                    )
+    except OSError as exc:
+        raise ValueError(f"file is neither a readable NetCDF nor a supported ZIP: {exc}") from exc
+
+
+def _valid_era5_file(path: Path, configured_variables: Iterable[str]) -> bool:
+    try:
+        _validate_era5_file(path, configured_variables)
+    except ValueError:
         return False
+    return True
+
+
+def _normalise_cds_download(
+    path: Path,
+    configured_variables: list[str],
+) -> dict[str, Any]:
+    """Convert a split CDS ZIP response into the single NetCDF used by later stages."""
+    if not zipfile.is_zipfile(path):
+        _validate_era5_file(path, configured_variables)
+        return {"response_format": "netcdf", "archive_members": []}
+
+    with zipfile.ZipFile(path) as archive:
+        members = [
+            member
+            for member in archive.infolist()
+            if not member.is_dir() and Path(member.filename).suffix.lower() in {".nc", ".nc4"}
+        ]
+        if not members:
+            raise ValueError("CDS ZIP response contains no NetCDF files")
+        encrypted = [member.filename for member in members if member.flag_bits & 0x1]
+        if encrypted:
+            raise ValueError(f"CDS ZIP response contains encrypted members: {encrypted}")
+
+        with tempfile.TemporaryDirectory(prefix="era5_", dir=path.parent) as temporary:
+            temporary_directory = Path(temporary)
+            extracted_paths = []
+            for index, member in enumerate(members):
+                extracted = temporary_directory / f"member_{index}.nc"
+                with archive.open(member) as source, extracted.open("wb") as destination:
+                    shutil.copyfileobj(source, destination)
+                extracted_paths.append(extracted)
+
+            normalised_path = temporary_directory / "combined.nc"
+            with ExitStack() as stack:
+                pieces = []
+                for extracted in extracted_paths:
+                    dataset = stack.enter_context(xr.open_dataset(extracted, engine="netcdf4"))
+                    try:
+                        piece = _normalise_dataset(
+                            dataset,
+                            configured_variables,
+                            require_all=False,
+                        )
+                    except ValueError as exc:
+                        if "none of the configured variables" in str(exc):
+                            continue
+                        raise
+                    pieces.append(piece)
+                if not pieces:
+                    raise ValueError(
+                        "CDS ZIP NetCDF files contain none of the configured variables"
+                    )
+                combined = xr.merge(pieces, join="outer", compat="no_conflicts")
+                combined = _normalise_dataset(combined, configured_variables)
+                combined.to_netcdf(normalised_path, engine="netcdf4")
+            normalised_path.replace(path)
+
+    _validate_era5_file(path, configured_variables)
+    return {
+        "response_format": "zip",
+        "archive_members": [member.filename for member in members],
+    }
 
 
 def _sha256(path: Path) -> str:
@@ -263,9 +403,10 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
     ledger = Path(config["paths"]["meteorology_ledger"])
     dataset_name = config["sources"]["era5_dataset"]
     interval = int(config["meteorology"].get("status_interval_seconds", 30))
-    client = _default_cds_client() if client is None else client
+    resolved_client = client
     downloaded = 0
     cached = 0
+    recovered = 0
     completed = 0
     seconds_per_month: list[float] = []
 
@@ -294,7 +435,39 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
 
         part = target.with_suffix(target.suffix + ".part")
         if part.exists():
-            part.unlink()
+            try:
+                response = _normalise_cds_download(part, variables)
+                _validate_era5_file(part, variables, request)
+                part.replace(target)
+            except ValueError as exc:
+                print(
+                    f"[ERA5 {year}] discarded unusable partial response: {exc}",
+                    flush=True,
+                )
+                part.unlink(missing_ok=True)
+            else:
+                recovered += 1
+                completed += 1
+                checksum = _sha256(target)
+                _append_ledger(
+                    ledger,
+                    {
+                        "dataset": dataset_name,
+                        "year": year,
+                        "status": "recovered",
+                        "path": str(target),
+                        "size_bytes": target.stat().st_size,
+                        "sha256": checksum,
+                        "request": request,
+                        **response,
+                    },
+                )
+                print(
+                    f"[ERA5 {year}] recovered retained response | overall "
+                    f"{completed}/{len(requests)} ({completed / len(requests):.0%})",
+                    flush=True,
+                )
+                continue
         average = sum(seconds_per_month) / len(seconds_per_month) if seconds_per_month else None
         remaining_months = sum(len(item[2]["month"]) for item in requests[position:])
         estimated_remaining = average * remaining_months if average is not None else None
@@ -304,7 +477,10 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
             flush=True,
         )
         started = time.monotonic()
+        response: dict[str, Any] = {}
         try:
+            if resolved_client is None:
+                resolved_client = _default_cds_client()
             with _StatusTicker(
                 year=year,
                 completed=completed,
@@ -312,10 +488,10 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 estimated_remaining=estimated_remaining,
                 interval_seconds=interval,
             ):
-                result = client.retrieve(dataset_name, request)
+                result = resolved_client.retrieve(dataset_name, request)
                 result.download(str(part))
-            if not _valid_era5_file(part, variables):
-                raise ValueError("downloaded file is not a readable ERA5 NetCDF with all variables")
+            response = _normalise_cds_download(part, variables)
+            _validate_era5_file(part, variables, request)
             part.replace(target)
         except Exception as exc:
             _append_ledger(
@@ -326,12 +502,13 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                     "status": "failed",
                     "path": str(target),
                     "error_type": type(exc).__name__,
+                    "failure_stage": "retrieve_or_validate",
                     "request": request,
                 },
             )
             raise RuntimeError(
-                f"ERA5 request for {year} failed. Check CDS credentials, accepted dataset "
-                "terms, service status, and the retained .part file."
+                f"ERA5 request for {year} failed during retrieval or validation: {exc}. "
+                "The .part response is retained when available and will be checked on the next run."
             ) from exc
 
         duration = time.monotonic() - started
@@ -353,6 +530,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 "sha256": checksum,
                 "elapsed_seconds": round(duration, 3),
                 "request": request,
+                **response,
             },
         )
         print(
@@ -366,6 +544,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
         "requested_chunks": len(requests),
         "downloaded_chunks": downloaded,
         "cached_chunks": cached,
+        "recovered_chunks": recovered,
         "raw_directory": str(config["paths"]["meteorology"]),
         "ledger": str(ledger),
     }

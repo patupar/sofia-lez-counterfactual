@@ -42,6 +42,11 @@ The CDS client can alternatively read the standard `CDSAPI_URL` and `CDSAPI_KEY`
 variables. `CDSAPI_RC` can point to a credential file in a non-default location. Credentials are
 never read from `configs/pipeline.yaml` or written to the download ledger.
 
+CDS may package accumulated precipitation and instantaneous variables in separate NetCDF files
+inside one ZIP response. Stage 6 detects this response, combines the members into the configured
+annual NetCDF file and validates every requested hour. A complete `.part` response retained after
+an interruption or validation error is checked and recovered before a new request is submitted.
+
 Prepare the two historical FILTER inputs:
 
 ```text

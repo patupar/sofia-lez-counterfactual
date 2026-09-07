@@ -92,6 +92,13 @@ opened and all configured variables have been found. Existing valid chunks are r
 download ledger stores the request, status, elapsed time, file size and SHA-256 checksum without
 storing authentication information.
 
+The CDS NetCDF converter separates instantaneous fields and accumulated fields such as total
+precipitation when their GRIB step types differ. It can therefore return a ZIP archive containing
+separate NetCDF members even when an unarchived response was requested. The downloader detects
+this case, combines the members by timestamp and grid coordinate, and writes one validated annual
+NetCDF file. Validation requires every configured variable and requested UTC hour. A retained
+complete `.part` response is processed before any replacement request is sent.
+
 `scripts/07_prepare_predictors.py` assigns each stable sensor-location pair to its nearest ERA5
 grid point and records that grid point's latitude and longitude. It calculates hourly relative
 humidity from temperature and dew point and hourly wind speed from the u- and v-components.

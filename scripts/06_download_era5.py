@@ -16,6 +16,7 @@ def main() -> None:
     print(f"ERA5 chunks requested: {summary['requested_chunks']}")
     print(f"Downloaded: {summary['downloaded_chunks']}")
     print(f"Already cached: {summary['cached_chunks']}")
+    print(f"Recovered from retained responses: {summary['recovered_chunks']}")
     print(f"Raw output: {summary['raw_directory']}")
     print(f"Download ledger: {summary['ledger']}")
 
