@@ -29,6 +29,19 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
+Stage 6 uses the Copernicus Climate Data Store (CDS) API. Create a CDS account, accept the
+licence for the ERA5 single-level dataset, and place the personal access token outside the
+repository in `~/.cdsapirc`:
+
+```yaml
+url: https://cds.climate.copernicus.eu/api
+key: <PERSONAL-ACCESS-TOKEN>
+```
+
+The CDS client can alternatively read the standard `CDSAPI_URL` and `CDSAPI_KEY` environment
+variables. `CDSAPI_RC` can point to a credential file in a non-default location. Credentials are
+never read from `configs/pipeline.yaml` or written to the download ledger.
+
 Prepare the two historical FILTER inputs:
 
 ```text
@@ -46,14 +59,23 @@ Review all dates, thresholds, and paths in [`configs/pipeline.yaml`](configs/pip
 Run the stages separately so every decision can be inspected:
 
 ```bash
-[...]
+python scripts/01_build_sensor_manifest.py --config configs/pipeline.yaml
+python scripts/02_download_archive.py --config configs/pipeline.yaml
+python scripts/03_prepare_sensor_observations.py --config configs/pipeline.yaml
+python scripts/04_check_sensor_completeness.py --config configs/pipeline.yaml
+python scripts/05_select_stable_panel.py --config configs/pipeline.yaml
+python scripts/06_download_era5.py --config configs/pipeline.yaml
+python scripts/07_prepare_predictors.py --config configs/pipeline.yaml
 ```
 
 Or run the complete sequence:
 
 ```bash
-[...]
+sofia-lez --config configs/pipeline.yaml run --include-provisional-panel
 ```
+
+Use `--skip-download` when the Sensor.Community archive is already cached and
+`--skip-era5-download` when the ERA5 NetCDF chunks are already cached.
 
 ## Workflow
 
@@ -65,15 +87,16 @@ Or run the complete sequence:
 | Daily aggregation | `data/processed/daily_pm25.csv` | Calculate daily PM₂.₅ and apply daily coverage and upper-bound checks |
 | Completeness assessment | `data/interim/diagnostics/completeness_sensor_year.csv` and `completeness_sensor_season.csv` | Measure sensor availability across the required periods |
 | Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
+| ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible yearly hourly ERA5 NetCDF chunks for the stable-panel extent |
+| Predictor preparation | `data/interim/predictors/daily_predictors.csv` | Match ERA5 grid cells to stable pairs and aggregate weather to Sofia local days |
 
 The subsequent workflow will:
 
-1. obtain and harmonise meteorological data;
-2. construct the daily model table;
-3. tune and validate the Random Forest model;
-4. train the selected model on pre-LEZ heating periods;
-5. predict the post-LEZ no-intervention baseline; and
-6. compare observed and predicted PM₂.₅ concentrations.
+1. construct the daily model table;
+2. tune and validate the Random Forest model;
+3. train the selected model on pre-LEZ heating periods;
+4. predict the post-LEZ no-intervention baseline; and
+5. compare observed and predicted PM₂.₅ concentrations.
 [...]
 
 ## Documentation
@@ -108,11 +131,10 @@ push and pull request.
 - [BGAir/FILTER dataset](https://figshare.com/articles/dataset/_i_Harmonized_Standardized_and_Corrected_Crowd-Sourced_Low-Cost_Sensor_i_PM_sub_2_5_sub_i_Data_f_i_i_rom_i_i_Sensor_community_and_PurpleAir_Networks_i_i_Across_Europe_i_/27195720/1) — historical sensor observations and sensor-location information
 - [Sensor.Community archive](https://archive.sensor.community/) — daily SDS011 observations from
   2024 onwards
+- [ERA5 hourly data on single levels](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels) — hourly meteorological predictors
 - [SofiaPlan API](https://sofiaplan.bg/api/) — Sofia Municipality boundary
 - [AirBG](https://airbg.info/en/build-a-station/) — information about Sofia’s community-operated
   sensor network
-
-[ToDO: meteorological data sources].
 
 ## License
 

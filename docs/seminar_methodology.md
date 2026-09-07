@@ -28,7 +28,12 @@ raw values are not described as corrected concentrations. `configs/pipeline.yaml
 dates, paths and thresholds that control the data workflow.
 
 #### 1.2.2 Meteorological Data
-[Draft: Derived from ERA5 ...]
+
+Meteorological predictors are derived from the ERA5 hourly single-level reanalysis. The selected
+variables are 2 m temperature, 2 m dew-point temperature, 10 m u- and v-wind, surface pressure,
+total precipitation and boundary-layer height. Using the hourly source rather than a derived
+daily product allows all variables to be aggregated to `Europe/Sofia` local dates, including
+23- and 25-hour days at daylight-saving transitions.
 
 
 ## 2. Preprocessing
@@ -76,10 +81,32 @@ on instructions to setup a status ticker. _
 
 #### Meteorological data
 
-Meteorological inputs must cover the complete study period and the Sofia study area. [...]
+`scripts/06_download_era5.py` reads the Stage 5 stable-panel coordinates and constructs the ERA5
+request area around their combined extent with a configured 0.25-degree buffer. The request
+settings are stored in `configs/pipeline.yaml`; no CDS credential is stored in the project. The
+CDS client reads the user's external `~/.cdsapirc` file or its standard environment variables.
 
-The preprocessing workflow harmonises these inputs to the sensor-day observations before it
-constructs the model table.
+Requests are split into yearly NetCDF chunks and include one additional date on either side of
+the study window. Downloads first use a `.part` file and are renamed only after the file can be
+opened and all configured variables have been found. Existing valid chunks are reused. The
+download ledger stores the request, status, elapsed time, file size and SHA-256 checksum without
+storing authentication information.
+
+`scripts/07_prepare_predictors.py` assigns each stable sensor-location pair to its nearest ERA5
+grid point and records that grid point's latitude and longitude. It calculates hourly relative
+humidity from temperature and dew point and hourly wind speed from the u- and v-components.
+Instantaneous variables are averaged across each Sofia local calendar day. Surface pressure is
+converted from Pa to hPa and temperature from K to degrees Celsius.
+
+ERA5 total precipitation is an hourly accumulation ending at the recorded timestamp. Daily
+precipitation therefore comprises intervals ending after local midnight through the following
+local midnight and is converted from metres to millimetres. The procedure requires the exact
+23, 24 or 25 hourly values expected for every local day and fails rather than imputing incomplete
+meteorological records.
+
+The resulting table also contains cyclical day-of-year variables, weekday and a heating-season
+label. The heating-season label is retained for grouping and diagnostics; it is not part of the
+initial numeric Random Forest predictor list.
 
 ### 2.2 Sensor quality control
 
@@ -210,7 +237,10 @@ surroundings are directly affected by the LEZ. Within the nine covered districts
 applies only to buildings on streets with an operational district-heating or gas-distribution
 network._
 
-Meteorological [... filled in later]
+Meteorological conditions are assigned from the nearest ERA5 grid point. The selected ERA5
+latitude and longitude remain in the predictor table so the spatial assignment can be inspected.
+ERA5 is not interpreted as neighbourhood-scale weather: its role is to control the broad daily
+meteorological variation affecting the fixed sensor locations.
 
 ### 3.2 Temporal harmonisation
 
@@ -224,15 +254,16 @@ being combined within the same local sensor-day around the source transition. Th
 rejects overlapping hourly records for the same sensor-location pair. The final study date is
 evaluated in Sofia local time.
 
-Meteorological timestamps use the same hourly or daily index before they are joined to sensor
-observations. Temporal aggregation uses only information from the corresponding observation
-period.
+ERA5 timestamps are parsed as UTC and converted to the same `Europe/Sofia` calendar used for the
+PM2.5 daily observations. Instantaneous variables and ending-time precipitation accumulations
+use separate interval rules before they are joined by local date. Temporal aggregation uses only
+information from the corresponding observation period.
 
 ## 4. Machine-learning workflow
 
 ### 4.1 Model table
 
-The model table contains [t.b.d.]. 
+The model table contains [t.b.d.].
 Daily PM₂.₅ is the response variable. Predictor columns contain meteorological conditions, 
 temporal variables and sensor coordinates. Only daily observations from the stable panel 
 with `daily_qc_pass == True` enter the model.
@@ -300,6 +331,8 @@ output.
 | Prepare hourly and daily observations | `scripts/03_prepare_sensor_observations.py` | `sensors.py`, `qc.py`, `daily.py` | Unified hourly and daily PM2.5 tables |
 | Calculate completeness | `scripts/04_check_sensor_completeness.py` | `completeness.py` | Sensor-year and sensor-season tables |
 | Select stable panel | `scripts/05_select_stable_panel.py` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
+| Retrieve ERA5 | `scripts/06_download_era5.py` | `meteorology.py` | Yearly NetCDF chunks and `download_ledger.jsonl` |
+| Prepare predictors | `scripts/07_prepare_predictors.py` | `meteorology.py` | `data/interim/predictors/daily_predictors.csv` |
 
 All entry points read `configs/pipeline.yaml`. `pyproject.toml` defines the Python dependencies.
 `sample_data/` contains synthetic data for `tests/test_pipeline.py` where  spatial filter, archive

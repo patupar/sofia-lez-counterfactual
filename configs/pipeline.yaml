@@ -10,6 +10,7 @@ sources:
   sofia_boundary_url: "https://api.sofiaplan.bg/datasets/79"
   sensor_community_archive: "https://archive.sensor.community"
   sensor_type: "sds011"
+  era5_dataset: "reanalysis-era5-single-levels"
 
 paths:
   # Download the FILTER BGR directory and Sensor_Location.csv separately, then set
@@ -27,9 +28,8 @@ paths:
   panel: "data/interim/diagnostics/stable_panel.csv"
   daily: "data/processed/daily_pm25.csv"
 
-  # Reserved for the next project stages. They are not populated by the
-  # sensor workflow yet.
-  meteorology: "data/raw/meteorology"
+  meteorology: "data/raw/meteorology/era5"
+  meteorology_ledger: "data/raw/meteorology/era5/download_ledger.jsonl"
   background: "data/raw/background"
   policy: "data/raw/policy"
   predictors: "data/interim/predictors/daily_predictors.csv"
@@ -51,6 +51,23 @@ download:
   workers: 8
   retries: 2
   timeout_seconds: 45
+
+meteorology:
+  # Requests are split by year so interrupted downloads can resume without
+  # repeating the complete 2018-2026 retrieval.
+  raw_file_pattern: "era5_single_levels_{year}.nc"
+  date_padding_days: 1
+  bbox_padding_degrees: 0.25
+  status_interval_seconds: 30
+  grid_assignment: "nearest"
+  variables:
+    - "2m_temperature"
+    - "2m_dewpoint_temperature"
+    - "10m_u_component_of_wind"
+    - "10m_v_component_of_wind"
+    - "surface_pressure"
+    - "total_precipitation"
+    - "boundary_layer_height"
 
 qc:
   pm25_min: 0.0

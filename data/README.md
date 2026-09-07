@@ -7,13 +7,13 @@ data/
 ├── raw/
 │   ├── filter/             BGR files and Sensor_Location.csv
 │   ├── sensor_community/   downloaded daily archive files
-│   ├── meteorology/        future weather inputs
+│   ├── meteorology/era5/   yearly hourly ERA5 NetCDF chunks and download ledger
 │   ├── background/         optional regional PM2.5 background
 │   └── policy/             future LEZ and district boundaries
 ├── interim/
 │   ├── sensors/            manifest and unified hourly observations
 │   ├── diagnostics/        QC and completeness tables
-│   └── predictors/         future processed predictors
+│   └── predictors/         daily meteorological, temporal and spatial predictors
 └── processed/
     ├── daily_pm25.csv
     ├── model_table.csv

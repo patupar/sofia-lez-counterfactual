@@ -10,6 +10,7 @@ sources:
   sofia_boundary_url: "https://api.sofiaplan.bg/datasets/79"
   sensor_community_archive: "https://archive.sensor.community"
   sensor_type: "sds011"
+  era5_dataset: "reanalysis-era5-single-levels"
 
 paths:
   sensor_locations: "sample_data/Sensor_Location.csv"
@@ -24,7 +25,8 @@ paths:
   completeness_season: "data/processed/sample_season.csv"
   panel: "data/processed/sample_panel.csv"
   daily: "data/processed/sample_daily.csv"
-  meteorology: "data/raw/meteorology"
+  meteorology: "data/raw/meteorology/sample_era5"
+  meteorology_ledger: "data/raw/meteorology/sample_era5/download_ledger.jsonl"
   background: "data/raw/background"
   policy: "data/raw/policy"
   predictors: "data/interim/predictors/sample_predictors.csv"
@@ -43,6 +45,21 @@ download:
   workers: 2
   retries: 0
   timeout_seconds: 5
+
+meteorology:
+  raw_file_pattern: "era5_single_levels_{year}.nc"
+  date_padding_days: 1
+  bbox_padding_degrees: 0.25
+  status_interval_seconds: 30
+  grid_assignment: "nearest"
+  variables:
+    - "2m_temperature"
+    - "2m_dewpoint_temperature"
+    - "10m_u_component_of_wind"
+    - "10m_v_component_of_wind"
+    - "surface_pressure"
+    - "total_precipitation"
+    - "boundary_layer_height"
 
 qc:
   pm25_min: 0.0

@@ -1,4 +1,4 @@
-"""Command-line interface for the six-stage data workflow."""
+"""Command-line interface for the sensor and ERA5 predictor workflow."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from .config import load_config
 from .daily import aggregate_daily
 from .downloader import download_archive
 from .manifest import build_manifest
+from .meteorology import download_era5, prepare_predictors
 from .sensors import build_unified_hourly
 
 
@@ -66,6 +67,19 @@ def _daily(config: dict) -> dict:
     }
 
 
+def _download_era5(config: dict) -> dict:
+    return download_era5(config)
+
+
+def _predictors(config: dict) -> dict:
+    table = prepare_predictors(config)
+    return {
+        "predictor_rows": len(table),
+        "stable_pairs": int(table[["location_id", "sensor_id"]].drop_duplicates().shape[0]),
+        "output": str(config["paths"]["predictors"]),
+    }
+
+
 COMMANDS: dict[str, Callable[[dict], dict]] = {
     "manifest": _manifest,
     "download": _download,
@@ -73,25 +87,32 @@ COMMANDS: dict[str, Callable[[dict], dict]] = {
     "aggregate-daily": _daily,
     "completeness": _completeness,
     "select-panel": _panel,
+    "download-era5": _download_era5,
+    "prepare-predictors": _predictors,
 }
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sofia-lez",
-        description="Prepare a stable, quality-controlled Sofia Sensor.Community PM2.5 panel.",
+        description="Prepare the Sofia PM2.5 panel and its daily ERA5 predictors.",
     )
     parser.add_argument("--config", default="configs/pipeline.yaml", help="YAML configuration path")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in COMMANDS:
-        subparsers.add_parser(command, help={
-            "manifest": "spatially filter Sofia pairs and summarize historical coverage",
-            "download": "download 2024–2026 archive files for plausible continuing sensors",
-            "qc-hourly": "combine FILTER and archive hours with documented source-specific QC",
-            "completeness": "calculate sensor-year and sensor-season completeness",
-            "select-panel": "choose pairs complete across the configured pre/post periods",
-            "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
-        }[command])
+        subparsers.add_parser(
+            command,
+            help={
+                "manifest": "spatially filter Sofia pairs and summarize historical coverage",
+                "download": "download 2024–2026 archive files for plausible continuing sensors",
+                "qc-hourly": "combine FILTER and archive hours with documented source-specific QC",
+                "completeness": "calculate sensor-year and sensor-season completeness",
+                "select-panel": "choose pairs complete across the configured pre/post periods",
+                "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
+                "download-era5": "download hourly ERA5 data for the stable-panel area",
+                "prepare-predictors": "prepare daily meteorological and temporal predictors",
+            }[command],
+        )
     run = subparsers.add_parser("run", help="run the implemented data-preparation sequence")
     run.add_argument(
         "--skip-download",
@@ -101,7 +122,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--include-provisional-panel",
         action="store_true",
-        help="also apply the provisional panel threshold before it has been reviewed",
+        help="apply the panel threshold and run the dependent ERA5 predictor stages",
+    )
+    run.add_argument(
+        "--skip-era5-download",
+        action="store_true",
+        help="use already cached ERA5 files when the predictor stages are included",
     )
     return parser
 
@@ -117,7 +143,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.skip_download:
         steps.remove("download")
     if not args.include_provisional_panel:
-        steps.remove("select-panel")
+        for step in ("select-panel", "download-era5", "prepare-predictors"):
+            steps.remove(step)
+    elif args.skip_era5_download:
+        steps.remove("download-era5")
     summary = {}
     for step in steps:
         print(f"[{step}]", flush=True)
