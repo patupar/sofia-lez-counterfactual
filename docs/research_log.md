@@ -292,10 +292,10 @@ Accepted values >=250: 0
 Accepted daily observations: 621,884
 ```
 
-### 3.2 Output and discussion on sensor completeness
+### 3.2 Output and discussion on sensor completeness 
 In-line with the decisions discussed previously, the completeness calculation was subsequently revised so that daily completeness is derived from the final QC output. Therefore, incorporating both the requirement for at least 18 valid hours and the exclusion of daily PM₂.₅ means equal to or above 250 µg/m³. Hourly completeness remains based on the hourly QC output.
 
-**Output 04/**
+**Output 04/** [06.09.2026]
 ```text
 Sensor-year rows: 3,807
 Sensor-season rows: 4,653 
@@ -325,6 +325,16 @@ Pairs meeting 60%: 145 / 423
 Pairs meeting 70%: 90 / 423
 ```
 
-The 60% threshold came about as a comprise between temporal completeness and sensor retention. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-internvtion period and post-intervention period. 
+The 60% threshold came about as a comprise between temporal completeness and sensor retention. Seeing that still 145/423 passed the 60% threshold, it will not be relaxed. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-intervention period and post-intervention period. 
+
+**Output 05/** [07.09.2026]
+```text
+Pairs passing aggregate 2018–2024 completeness: 145
+Pairs passing both post-intervention periods: 202
+Pairs passing all criteria: 77
+```
+Final stable panel contains 77 sensor-location pairs, corresponding to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, they provide sufficient aggregate pre-innervation coverage and meet the completeness requirement during both both pre- and post-intervention periods. Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
+
+
 
 
