@@ -297,7 +297,7 @@ The 822 observations include all calculated daily means reaching the threshold b
 ### 3.2 Output and discussion on sensor completeness 
 In-line with the decisions discussed previously, the completeness calculation was subsequently revised so that daily completeness is derived from the final QC output. Therefore, incorporating both the requirement for at least 18 valid hours and the exclusion of daily PM₂.₅ means equal to or above 250 µg/m³. Hourly completeness remains based on the hourly QC output.
 
-**Output 04/** [06.09.2026]
+**Output scripts/04_check_sensor_completeness** [06.09.2026]
 ```text
 Sensor-year rows: 3,807
 Sensor-season rows: 4,653 
@@ -327,9 +327,11 @@ Pairs meeting 60%: 145 / 423
 Pairs meeting 70%: 90 / 423
 ```
 
-The 60% threshold came about as a comprise between temporal completeness and sensor retention. Seeing that still 145/423 passed the 60% threshold, it will not be relaxed. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-intervention period and post-intervention period. 
+The 60% threshold came about as a comprise between temporal completeness and sensor retention. Seeing that still 145/423 passed the 60% threshold, it will not be relaxed. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-intervention period and both post-intervention periods.
 
-**Output 05/** [07.09.2026]
+From here, final panel selection will be performed by script/05_select_stable_panel.py
+
+**Output script/05_select_stable_panel** [07.09.2026]
 ```text
 Candidate sensor-location pairs: 423
 Pairs passing aggregate 2018–2024 completeness: 145
