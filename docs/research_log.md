@@ -283,8 +283,21 @@ Twenty highest valid daily observations:
 Inspection of the results fortunately report a low extreme value count. However, 696 records are equal or above 250µg/m³ which most likely is not plausible for the Sofia context. Furthermore repeated values of exactly 999.9µg/m³ from individual Sensor.Community sensors, including during the summer do not resemble genuine pollution episodes. Instead, corresponding to the upper measurement range of the SDS011 sensor and QC check -> likely indicates sensor saturation or malfunction. These observations should be omitted before moving on. In the context of this project, measurements ≥ 250 µg/m³ will be left out.
 
 **Second run 03** [05.09.2026]
-After second run, no sensor-day combines FILTER and Sensor.Community data. All daily means ≥ 250 µg/m³ are removed. 621,884 daily observations remain available. 
+After second run, no sensor-day combines FILTER and Sensor.Community data. All daily means ≥ 250 µg/m³ are removed.  Running with the implemented changes, the number of accepted daily observations declined from 622,594 to 621,884 rather than by the full 822 observations. 
+
+```text
+Mixed-source sensor-days: 0
+Daily means >=250 before screening: 822
+Accepted values >=250: 0
+Accepted daily observations: 621,884
+```
 
 ### 3.2 Output and discussion on sensor completeness
+In-line with the decisions discussed previously, the completeness calculation was subsequently revised so that daily completeness is derived from the final QC output. Therefore, incorporating both the requirement for at least 18 valid hours and the exclusion of daily PM₂.₅ means equal to or above 250 µg/m³. Hourly completeness remains based on the hourly QC output.
 
+**Output 04/**
+```text
+Sensor-year rows: 3,807
+Sensor-season rows: 4,653 
+```
 
