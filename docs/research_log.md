@@ -34,7 +34,7 @@ Suggests relatively strong initial position to continue pursuing the route of us
 
 - 133 started reporting in 2018;
 - 204 started before 2020;
-- 343 contain at least 8,760 historical QC-valid hours, equivalent to one full year of hourly data;
+- 343 contain at least 8,760 historical QC-valid hours (manifest-stage FILTER checks), equivalent to one full year of hourly data;
 - median candidate contains 28,623 raw historical hours;
 - median historical QC-pass rate is 96.5%.
 
@@ -280,7 +280,7 @@ Twenty highest valid daily observations:
 2024-09-27        14474      25804 sensor_community           21  999.9
 ```
 
-Inspection of the results fortunately report a low extreme value count. However, 696 records are equal or above 250µg/m³ which most likely is not plausible for the Sofia context. Furthermore repeated values of exactly 999.9µg/m³ from individual Sensor.Community sensors, including during the summer do not resemble genuine pollution episodes. Instead, corresponding to the upper measurement range of the SDS011 sensor and QC check -> likely indicates sensor saturation or malfunction. These observations should be omitted before moving on. In the context of this project, measurements ≥ 250 µg/m³ will be left out.
+Inspection of the results fortunately report a low extreme value count. However, 696 records are equal or above 250µg/m³ which most likely is not plausible for the Sofia context. Furthermore repeated values of exactly 999.9µg/m³ from individual Sensor.Community sensors, including during the summer do not resemble genuine pollution episodes. Instead, corresponding to the upper measurement range of the SDS011 sensor and QC check -> likely indicates sensor saturation or malfunction. These observations should be omitted before moving on. For this project, daily PM₂.₅ means equal to or above 250 µg/m³ will be excluded from the analytical dataset.
 
 **Second run 03** [05.09.2026]
 After second run, no sensor-day combines FILTER and Sensor.Community data. All daily means ≥ 250 µg/m³ are removed.  Running with the implemented changes, the number of accepted daily observations declined from 622,594 to 621,884 rather than by the full 822 observations. 
@@ -291,6 +291,8 @@ Daily means >=250 before screening: 822
 Accepted values >=250: 0
 Accepted daily observations: 621,884
 ```
+The 822 observations include all calculated daily means reaching the threshold before final daily QC. Some already failed the 18-hour requirement. The earlier count of 696 referred only to observations classified as valid under the preceding workflow. The values are therefore not directly equivalent.
+
 
 ### 3.2 Output and discussion on sensor completeness 
 In-line with the decisions discussed previously, the completeness calculation was subsequently revised so that daily completeness is derived from the final QC output. Therefore, incorporating both the requirement for at least 18 valid hours and the exclusion of daily PM₂.₅ means equal to or above 250 µg/m³. Hourly completeness remains based on the hourly QC output.
@@ -329,11 +331,13 @@ The 60% threshold came about as a comprise between temporal completeness and sen
 
 **Output 05/** [07.09.2026]
 ```text
+Candidate sensor-location pairs: 423
 Pairs passing aggregate 2018–2024 completeness: 145
-Pairs passing both post-intervention periods: 202
+Pairs passing post_2025_jan_mar: 259
+Pairs passing post_2025_oct_mar: 212
 Pairs passing all criteria: 77
 ```
-Final stable panel contains 77 sensor-location pairs, corresponding to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, they provide sufficient aggregate pre-innervation coverage and meet the completeness requirement during both both pre- and post-intervention periods. Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
+Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, each pair meets three separate completeness criteria: at least 60% across the pooled pre-intervention period from 2018 to 2024, at least 60% during January–March 2025, and at least 60% during October 2025–March 2026. Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
 
 
 
