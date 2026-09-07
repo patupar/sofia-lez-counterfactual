@@ -47,7 +47,7 @@ download:
   timeout_seconds: 5
 
 meteorology:
-  raw_file_pattern: "era5_single_levels_{year}.nc"
+  raw_file_pattern: "era5_single_levels_{year}_{month}.nc"
   date_padding_days: 1
   bbox_padding_degrees: 0.25
   status_interval_seconds: 30

@@ -44,7 +44,8 @@ never read from `configs/pipeline.yaml` or written to the download ledger.
 
 CDS may package accumulated precipitation and instantaneous variables in separate NetCDF files
 inside one ZIP response. Stage 6 detects this response, combines the members into the configured
-annual NetCDF file and validates every requested hour. A complete `.part` response retained after
+monthly NetCDF file and validates every requested hour. Requests are submitted one month at a
+time to remain below the CDS request-cost limit. A complete `.part` response retained after
 an interruption or validation error is checked and recovered before a new request is submitted.
 
 Prepare the two historical FILTER inputs:
@@ -92,7 +93,7 @@ Use `--skip-download` when the Sensor.Community archive is already cached and
 | Daily aggregation | `data/processed/daily_pm25.csv` | Calculate daily PM₂.₅ and apply daily coverage and upper-bound checks |
 | Completeness assessment | `data/interim/diagnostics/completeness_sensor_year.csv` and `completeness_sensor_season.csv` | Measure sensor availability across the required periods |
 | Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
-| ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible yearly hourly ERA5 NetCDF chunks for the stable-panel extent |
+| ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible monthly hourly ERA5 NetCDF chunks for the stable-panel extent |
 | Predictor preparation | `data/interim/predictors/daily_predictors.csv` | Match ERA5 grid cells to stable pairs and aggregate weather to Sofia local days |
 
 The subsequent workflow will:

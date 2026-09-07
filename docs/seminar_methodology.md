@@ -86,16 +86,18 @@ request area around their combined extent with a configured 0.25-degree buffer. 
 settings are stored in `configs/pipeline.yaml`; no CDS credential is stored in the project. The
 CDS client reads the user's external `~/.cdsapirc` file or its standard environment variables.
 
-Requests are split into yearly NetCDF chunks and include one additional date on either side of
-the study window. Downloads first use a `.part` file and are renamed only after the file can be
-opened and all configured variables have been found. Existing valid chunks are reused. The
-download ledger stores the request, status, elapsed time, file size and SHA-256 checksum without
-storing authentication information.
+Requests are split into monthly NetCDF chunks and include one additional date on either side of
+the study window. Monthly requests follow ECMWF guidance for hourly ERA5 retrievals and remain
+below the CDS request-cost limit encountered by the initial annual request. Downloads first use a
+`.part` file and are renamed only after the file can be opened and all configured variables and
+requested hours have been found. Existing valid chunks are reused. The download ledger stores the
+request, status, elapsed time, file size and SHA-256 checksum without storing authentication
+information.
 
 The CDS NetCDF converter separates instantaneous fields and accumulated fields such as total
 precipitation when their GRIB step types differ. It can therefore return a ZIP archive containing
 separate NetCDF members even when an unarchived response was requested. The downloader detects
-this case, combines the members by timestamp and grid coordinate, and writes one validated annual
+this case, combines the members by timestamp and grid coordinate, and writes one validated monthly
 NetCDF file. Validation requires every configured variable and requested UTC hour. A retained
 complete `.part` response is processed before any replacement request is sent.
 

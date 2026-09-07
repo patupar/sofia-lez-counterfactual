@@ -28,5 +28,7 @@ The future filenames document the intended order; empty placeholder Python files
 
 `06_download_era5.py` requires external CDS credentials. The script accepts both a direct NetCDF
 response and the split instantaneous/accumulated ZIP response currently returned for the selected
-variables. Retained responses and completed annual files are reused. Tests and the synthetic
-sample workflow do not contact CDS.
+variables. Requests and cache files are monthly to remain below the CDS request-cost limit.
+Retained responses and completed monthly files are reused; the December 2017 cache created by the
+earlier annual naming scheme is migrated automatically. Tests and the synthetic sample workflow
+do not contact CDS.

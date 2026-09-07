@@ -85,7 +85,7 @@ def era5_area(config: dict, panel: pd.DataFrame | None = None) -> list[float]:
 
 
 def build_era5_requests(config: dict) -> list[tuple[int, Path, dict[str, Any]]]:
-    """Build auditable yearly CDS requests without contacting the service."""
+    """Build auditable monthly CDS requests without contacting the service."""
     panel = _stable_panel(config)
     settings = config["meteorology"]
     variables = list(settings["variables"])
@@ -96,23 +96,36 @@ def build_era5_requests(config: dict) -> list[tuple[int, Path, dict[str, Any]]]:
     if unsupported:
         raise ValueError(f"Unsupported ERA5 variables in configuration: {unsupported}")
     raw_directory = Path(config["paths"]["meteorology"])
-    pattern = settings.get("raw_file_pattern", "era5_single_levels_{year}.nc")
+    pattern = settings.get("raw_file_pattern", "era5_single_levels_{year}_{month}.nc")
+    if "{year}" not in pattern or "{month}" not in pattern:
+        raise ValueError(
+            "meteorology.raw_file_pattern must include both {year} and {month} "
+            "so every monthly ERA5 request has a unique cache file"
+        )
     days = [f"{day:02d}" for day in range(1, 32)]
     hours = [f"{hour:02d}:00" for hour in range(24)]
     requests = []
     for year, months in _request_months(config).items():
-        request = {
-            "product_type": ["reanalysis"],
-            "variable": variables,
-            "year": [str(year)],
-            "month": months,
-            "day": days,
-            "time": hours,
-            "data_format": "netcdf",
-            "download_format": "unarchived",
-            "area": era5_area(config, panel),
-        }
-        requests.append((year, raw_directory / pattern.format(year=year), request))
+        for month in months:
+            request = {
+                "product_type": ["reanalysis"],
+                "variable": variables,
+                "year": [str(year)],
+                "month": [month],
+                "day": days,
+                "time": hours,
+                "data_format": "netcdf",
+                "download_format": "unarchived",
+                "area": era5_area(config, panel),
+            }
+            target = raw_directory / pattern.format(year=year, month=month)
+            requests.append((year, target, request))
+    paths = [path for _, path, _ in requests]
+    if len(paths) != len(set(paths)):
+        raise ValueError(
+            "meteorology.raw_file_pattern must include both {year} and {month} "
+            "so every monthly ERA5 request has a unique cache file"
+        )
     return requests
 
 
@@ -190,7 +203,7 @@ def _normalise_dataset(
 
 
 def _expected_request_times(request: dict[str, Any]) -> pd.DatetimeIndex:
-    """Return all valid UTC hours represented by one annual CDS request."""
+    """Return all valid UTC hours represented by one CDS request."""
     ranges = []
     year = int(request["year"][0])
     requested_days = {int(value) for value in request["day"]}
@@ -244,9 +257,13 @@ def _validate_era5_file(
         raise ValueError(f"file is neither a readable NetCDF nor a supported ZIP: {exc}") from exc
 
 
-def _valid_era5_file(path: Path, configured_variables: Iterable[str]) -> bool:
+def _valid_era5_file(
+    path: Path,
+    configured_variables: Iterable[str],
+    request: dict[str, Any] | None = None,
+) -> bool:
     try:
-        _validate_era5_file(path, configured_variables)
+        _validate_era5_file(path, configured_variables, request)
     except ValueError:
         return False
     return True
@@ -343,13 +360,13 @@ class _StatusTicker:
     def __init__(
         self,
         *,
-        year: int,
+        chunk_label: str,
         completed: int,
         total: int,
         estimated_remaining: float | None,
         interval_seconds: int,
     ) -> None:
-        self.year = year
+        self.chunk_label = chunk_label
         self.completed = completed
         self.total = total
         self.estimated_remaining = estimated_remaining
@@ -362,7 +379,8 @@ class _StatusTicker:
         elapsed = time.monotonic() - self.started
         progress = self.completed / self.total if self.total else 0.0
         return (
-            f"[ERA5 {self.year}] request active | overall {self.completed}/{self.total} "
+            f"[ERA5 {self.chunk_label}] request active | overall "
+            f"{self.completed}/{self.total} "
             f"({progress:.0%}) "
             f"| chunk elapsed {_format_duration(elapsed)} "
             f"| estimated remaining {_format_duration(self.estimated_remaining)}"
@@ -396,8 +414,41 @@ def _default_cds_client():
         ) from exc
 
 
+def _migrate_legacy_single_month_cache(
+    config: dict,
+    requests: list[tuple[int, Path, dict[str, Any]]],
+    variables: list[str],
+) -> None:
+    """Rename a valid legacy annual cache when that year needs only one month."""
+    by_year: dict[int, list[tuple[Path, dict[str, Any]]]] = {}
+    for year, target, request in requests:
+        by_year.setdefault(year, []).append((target, request))
+
+    raw_directory = Path(config["paths"]["meteorology"])
+    for year, chunks in by_year.items():
+        if len(chunks) != 1:
+            continue
+        target, request = chunks[0]
+        legacy = raw_directory / f"era5_single_levels_{year}.nc"
+        if legacy == target or target.exists():
+            continue
+        if _valid_era5_file(legacy, variables, request):
+            ensure_parent(target)
+            legacy.replace(target)
+            print(
+                f"[ERA5 {year}-{request['month'][0]}] migrated legacy annual cache",
+                flush=True,
+            )
+            continue
+        legacy_part = legacy.with_suffix(legacy.suffix + ".part")
+        target_part = target.with_suffix(target.suffix + ".part")
+        if legacy_part.exists() and not target_part.exists():
+            ensure_parent(target_part)
+            legacy_part.replace(target_part)
+
+
 def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
-    """Download resumable yearly ERA5 NetCDF chunks and record their provenance."""
+    """Download resumable monthly ERA5 NetCDF chunks and record their provenance."""
     requests = build_era5_requests(config)
     variables = list(config["meteorology"]["variables"])
     ledger = Path(config["paths"]["meteorology_ledger"])
@@ -408,16 +459,20 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
     cached = 0
     recovered = 0
     completed = 0
-    seconds_per_month: list[float] = []
+    chunk_durations: list[float] = []
+
+    _migrate_legacy_single_month_cache(config, requests, variables)
 
     for position, (year, target, request) in enumerate(requests):
+        chunk_label = f"{year}-{request['month'][0]}"
         ensure_parent(target)
-        if _valid_era5_file(target, variables):
+        if _valid_era5_file(target, variables, request):
             cached += 1
             completed += 1
             progress = completed / len(requests)
             print(
-                f"[ERA5 {year}] cached | overall {completed}/{len(requests)} ({progress:.0%})",
+                f"[ERA5 {chunk_label}] cached | overall "
+                f"{completed}/{len(requests)} ({progress:.0%})",
                 flush=True,
             )
             _append_ledger(
@@ -425,6 +480,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 {
                     "dataset": dataset_name,
                     "year": year,
+                    "month": request["month"][0],
                     "status": "cached",
                     "path": str(target),
                     "sha256": _sha256(target),
@@ -441,7 +497,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 part.replace(target)
             except ValueError as exc:
                 print(
-                    f"[ERA5 {year}] discarded unusable partial response: {exc}",
+                    f"[ERA5 {chunk_label}] discarded unusable partial response: {exc}",
                     flush=True,
                 )
                 part.unlink(missing_ok=True)
@@ -454,6 +510,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                     {
                         "dataset": dataset_name,
                         "year": year,
+                        "month": request["month"][0],
                         "status": "recovered",
                         "path": str(target),
                         "size_bytes": target.stat().st_size,
@@ -463,16 +520,16 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                     },
                 )
                 print(
-                    f"[ERA5 {year}] recovered retained response | overall "
+                    f"[ERA5 {chunk_label}] recovered retained response | overall "
                     f"{completed}/{len(requests)} ({completed / len(requests):.0%})",
                     flush=True,
                 )
                 continue
-        average = sum(seconds_per_month) / len(seconds_per_month) if seconds_per_month else None
-        remaining_months = sum(len(item[2]["month"]) for item in requests[position:])
-        estimated_remaining = average * remaining_months if average is not None else None
+        average = sum(chunk_durations) / len(chunk_durations) if chunk_durations else None
+        remaining_chunks = len(requests) - position
+        estimated_remaining = average * remaining_chunks if average is not None else None
         print(
-            f"[ERA5 {year}] starting request {completed + 1}/{len(requests)} "
+            f"[ERA5 {chunk_label}] starting request {completed + 1}/{len(requests)} "
             f"| ETA {_format_duration(estimated_remaining)}",
             flush=True,
         )
@@ -482,7 +539,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
             if resolved_client is None:
                 resolved_client = _default_cds_client()
             with _StatusTicker(
-                year=year,
+                chunk_label=chunk_label,
                 completed=completed,
                 total=len(requests),
                 estimated_remaining=estimated_remaining,
@@ -499,6 +556,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 {
                     "dataset": dataset_name,
                     "year": year,
+                    "month": request["month"][0],
                     "status": "failed",
                     "path": str(target),
                     "error_type": type(exc).__name__,
@@ -507,23 +565,24 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
                 },
             )
             raise RuntimeError(
-                f"ERA5 request for {year} failed during retrieval or validation: {exc}. "
+                f"ERA5 request for {chunk_label} failed during retrieval or validation: {exc}. "
                 "The .part response is retained when available and will be checked on the next run."
             ) from exc
 
         duration = time.monotonic() - started
-        seconds_per_month.append(duration / len(request["month"]))
+        chunk_durations.append(duration)
         downloaded += 1
         completed += 1
-        average = sum(seconds_per_month) / len(seconds_per_month)
-        remaining_months = sum(len(item[2]["month"]) for item in requests[position + 1 :])
-        estimated_remaining = average * remaining_months
+        average = sum(chunk_durations) / len(chunk_durations)
+        remaining_chunks = len(requests) - completed
+        estimated_remaining = average * remaining_chunks
         checksum = _sha256(target)
         _append_ledger(
             ledger,
             {
                 "dataset": dataset_name,
                 "year": year,
+                "month": request["month"][0],
                 "status": "downloaded",
                 "path": str(target),
                 "size_bytes": target.stat().st_size,
@@ -534,7 +593,7 @@ def download_era5(config: dict, client: object | None = None) -> dict[str, Any]:
             },
         )
         print(
-            f"[ERA5 {year}] complete in {_format_duration(duration)} | overall "
+            f"[ERA5 {chunk_label}] complete in {_format_duration(duration)} | overall "
             f"{completed}/{len(requests)} ({completed / len(requests):.0%}) "
             f"| ETA {_format_duration(estimated_remaining)}",
             flush=True,

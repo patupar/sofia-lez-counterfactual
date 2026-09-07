@@ -65,7 +65,12 @@ class _FakeCdsClient:
 
     def retrieve(self, dataset_name: str, request: dict) -> _FakeResult:
         self.calls.append((dataset_name, request))
-        return _FakeResult(self.dataset, self.response_format)
+        time_name = "valid_time" if "valid_time" in self.dataset.dims else "time"
+        times = pd.DatetimeIndex(self.dataset[time_name].values)
+        years = {int(value) for value in request["year"]}
+        months = {int(value) for value in request["month"]}
+        positions = np.flatnonzero(times.year.isin(years) & times.month.isin(months))
+        return _FakeResult(self.dataset.isel({time_name: positions}), self.response_format)
 
 
 def _test_config(tmp_path: Path) -> dict:
@@ -94,7 +99,7 @@ def _test_config(tmp_path: Path) -> dict:
             "predictors": tmp_path / "daily_predictors.csv",
         },
         "meteorology": {
-            "raw_file_pattern": "era5_single_levels_{year}.nc",
+            "raw_file_pattern": "era5_single_levels_{year}_{month}.nc",
             "date_padding_days": 0,
             "bbox_padding_degrees": 0.25,
             "status_interval_seconds": 60,
@@ -144,13 +149,38 @@ def test_request_uses_only_stable_panel_extent(tmp_path: Path):
     config = _test_config(tmp_path)
     requests = build_era5_requests(config)
 
-    assert len(requests) == 1
+    assert len(requests) == 2
     year, path, request = requests[0]
     assert year == 2024
-    assert path.name == "era5_single_levels_2024.nc"
+    assert path.name == "era5_single_levels_2024_03.nc"
     assert request["area"] == [42.95, 23.05, 42.45, 23.55]
     assert request["variable"] == VARIABLES
-    assert "2024" in request["year"]
+    assert request["year"] == ["2024"]
+    assert request["month"] == ["03"]
+    assert requests[1][1].name == "era5_single_levels_2024_04.nc"
+    assert requests[1][2]["month"] == ["04"]
+
+
+def test_monthly_cache_pattern_must_include_month(tmp_path: Path):
+    config = _test_config(tmp_path)
+    config["meteorology"]["raw_file_pattern"] = "era5_single_levels_{year}.nc"
+
+    with pytest.raises(ValueError, match=r"include both \{year\} and \{month\}"):
+        build_era5_requests(config)
+
+
+def test_full_project_window_is_split_into_monthly_requests(tmp_path: Path):
+    config = _test_config(tmp_path)
+    config["project"]["study_start_date"] = "2018-01-01"
+    config["project"]["end_date"] = "2026-03-31"
+    config["meteorology"]["date_padding_days"] = 1
+
+    requests = build_era5_requests(config)
+
+    assert len(requests) == 101
+    assert requests[0][1].name == "era5_single_levels_2017_12.nc"
+    assert requests[-1][1].name == "era5_single_levels_2026_04.nc"
+    assert all(len(request["month"]) == 1 for _, _, request in requests)
 
 
 def test_expected_local_hours_include_both_dst_transitions():
@@ -168,10 +198,10 @@ def test_download_and_prepare_predictors_without_network(tmp_path: Path):
     summary = download_era5(config, client=client)
     predictors = prepare_predictors(config)
 
-    assert summary["downloaded_chunks"] == 1
+    assert summary["downloaded_chunks"] == 2
     assert summary["cached_chunks"] == 0
     assert summary["recovered_chunks"] == 0
-    assert len(client.calls) == 1
+    assert len(client.calls) == 2
     assert len(predictors) == 3
     assert predictors["meteorology_hours"].tolist() == [24, 23, 24]
     assert predictors["precipitation_sum_mm"].tolist() == pytest.approx([24.0, 23.0, 24.0])
@@ -189,18 +219,23 @@ def test_download_and_prepare_predictors_without_network(tmp_path: Path):
         json.loads(line)
         for line in Path(config["paths"]["meteorology_ledger"]).read_text().splitlines()
     ]
-    assert records[0]["status"] == "downloaded"
-    assert records[0]["response_format"] == "zip"
-    assert records[0]["archive_members"] == [
-        "data_stream-oper_stepType-instant.nc",
-        "data_stream-oper_stepType-accum.nc",
-    ]
-    assert "sha256" in records[0]
+    assert [record["month"] for record in records] == ["03", "04"]
+    assert all(record["status"] == "downloaded" for record in records)
+    assert all(record["response_format"] == "zip" for record in records)
+    assert all(
+        record["archive_members"]
+        == [
+            "data_stream-oper_stepType-instant.nc",
+            "data_stream-oper_stepType-accum.nc",
+        ]
+        for record in records
+    )
+    assert all("sha256" in record for record in records)
     assert "key" not in json.dumps(records[0]).lower()
 
     second_summary = download_era5(config, client=client)
-    assert second_summary["cached_chunks"] == 1
-    assert len(client.calls) == 1
+    assert second_summary["cached_chunks"] == 2
+    assert len(client.calls) == 2
 
 
 def test_direct_netcdf_response_remains_supported(tmp_path: Path):
@@ -209,7 +244,7 @@ def test_direct_netcdf_response_remains_supported(tmp_path: Path):
 
     summary = download_era5(config, client=client)
 
-    assert summary["downloaded_chunks"] == 1
+    assert summary["downloaded_chunks"] == 2
     record = json.loads(Path(config["paths"]["meteorology_ledger"]).read_text().splitlines()[0])
     assert record["response_format"] == "netcdf"
 
@@ -219,9 +254,11 @@ def test_retained_zip_response_is_recovered_without_new_request(
 ):
     config = _test_config(tmp_path)
     dataset = _synthetic_era5(config)
-    part = Path(config["paths"]["meteorology"]) / "era5_single_levels_2024.nc.part"
-    part.parent.mkdir(parents=True)
-    _FakeResult(dataset, "zip").download(str(part))
+    preload_client = _FakeCdsClient(dataset, response_format="zip")
+    for _, target, request in build_era5_requests(config):
+        part = target.with_suffix(target.suffix + ".part")
+        part.parent.mkdir(parents=True, exist_ok=True)
+        preload_client.retrieve("reanalysis-era5-single-levels", request).download(str(part))
     monkeypatch.setattr(
         "sofia_lez.meteorology._default_cds_client",
         lambda: pytest.fail("CDS client should not be created while recovering a valid response"),
@@ -230,11 +267,11 @@ def test_retained_zip_response_is_recovered_without_new_request(
     summary = download_era5(config)
     predictors = prepare_predictors(config)
 
-    assert summary["recovered_chunks"] == 1
+    assert summary["recovered_chunks"] == 2
     assert summary["downloaded_chunks"] == 0
     assert len(predictors) == 3
-    assert not zipfile.is_zipfile(
-        Path(config["paths"]["meteorology"]) / "era5_single_levels_2024.nc"
+    assert all(
+        not zipfile.is_zipfile(target) for _, target, _ in build_era5_requests(config)
     )
 
 
@@ -245,13 +282,15 @@ def test_invalid_response_reports_the_validation_reason(tmp_path: Path):
     with pytest.raises(RuntimeError, match="neither a readable NetCDF nor a supported ZIP"):
         download_era5(config, client=client)
 
-    part = Path(config["paths"]["meteorology"]) / "era5_single_levels_2024.nc.part"
+    target = build_era5_requests(config)[0][1]
+    part = target.with_suffix(target.suffix + ".part")
     assert part.exists()
 
 
 def test_unusable_retained_response_is_replaced(tmp_path: Path):
     config = _test_config(tmp_path)
-    part = Path(config["paths"]["meteorology"]) / "era5_single_levels_2024.nc.part"
+    target = build_era5_requests(config)[0][1]
+    part = target.with_suffix(target.suffix + ".part")
     part.parent.mkdir(parents=True)
     part.write_text("interrupted response", encoding="utf-8")
     client = _FakeCdsClient(_synthetic_era5(config), response_format="zip")
@@ -259,8 +298,32 @@ def test_unusable_retained_response_is_replaced(tmp_path: Path):
     summary = download_era5(config, client=client)
 
     assert summary["recovered_chunks"] == 0
-    assert summary["downloaded_chunks"] == 1
-    assert len(client.calls) == 1
+    assert summary["downloaded_chunks"] == 2
+    assert len(client.calls) == 2
+
+
+def test_single_month_legacy_annual_cache_is_migrated(tmp_path: Path, monkeypatch):
+    config = _test_config(tmp_path)
+    config["project"]["study_start_date"] = "2024-03-10"
+    config["project"]["end_date"] = "2024-03-11"
+    dataset = _synthetic_era5(config).sel(
+        valid_time=slice("2024-03-01 00:00:00", "2024-03-31 23:00:00")
+    )
+    legacy = Path(config["paths"]["meteorology"]) / "era5_single_levels_2024.nc"
+    legacy.parent.mkdir(parents=True)
+    dataset.to_netcdf(legacy, engine="netcdf4")
+    monkeypatch.setattr(
+        "sofia_lez.meteorology._default_cds_client",
+        lambda: pytest.fail("CDS client should not be created for a valid legacy cache"),
+    )
+
+    summary = download_era5(config)
+    target = build_era5_requests(config)[0][1]
+
+    assert summary["cached_chunks"] == 1
+    assert target.name == "era5_single_levels_2024_03.nc"
+    assert target.exists()
+    assert not legacy.exists()
 
 
 def test_missing_requested_hour_is_rejected(tmp_path: Path):

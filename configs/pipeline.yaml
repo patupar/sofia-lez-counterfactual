@@ -53,9 +53,9 @@ download:
   timeout_seconds: 45
 
 meteorology:
-  # Requests are split by year so interrupted downloads can resume without
-  # repeating the complete 2018-2026 retrieval.
-  raw_file_pattern: "era5_single_levels_{year}.nc"
+  # CDS recommends monthly requests for hourly ERA5. This also keeps each
+  # request below the service cost limit and makes interrupted runs resumable.
+  raw_file_pattern: "era5_single_levels_{year}_{month}.nc"
   date_padding_days: 1
   bbox_padding_degrees: 0.25
   status_interval_seconds: 30
