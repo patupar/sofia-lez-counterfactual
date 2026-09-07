@@ -337,7 +337,10 @@ Pairs passing post_2025_jan_mar: 259
 Pairs passing post_2025_oct_mar: 212
 Pairs passing all criteria: 77
 ```
-Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, each pair meets three separate completeness criteria: at least 60% across the pooled pre-intervention period from 2018 to 2024, at least 60% during January–March 2025, and at least 60% during October 2025–March 2026. Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
+Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, each pair meets three separate completeness criteria: at least 60% across the pooled pre-intervention period from 2018 to 2024, at least 60% during January–March 2025, and at least 60% during October 2025–March 2026. As model training will be restricted to the heating months, their pre-intervention heating-month coverage was also inspected. Mean completeness was 72.4% and median completeness was 69.5%. Of the 77 pairs, 71 met the 60% threshold and all met at least 50%, corresponding to a minimum of 655 valid sensor-days -> decision: existing panel will therefore be retained.
+
+Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
+
 
 
 
