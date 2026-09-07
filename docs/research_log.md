@@ -300,4 +300,31 @@ In-line with the decisions discussed previously, the completeness calculation wa
 Sensor-year rows: 3,807
 Sensor-season rows: 4,653 
 ```
+Across sensor-year combinations, mean daily completeness was 49.0% and median completeness was 58.1%. 
+These values include all 423 candidate pairs in every period, including sensors that had not yet started operating or had stopped reporting. Therefore -> describe total availability of the network rather than the reliability of individual sensors while active. 
+
+Coverage appears to have increased between 2018 - 2024, with the main exception being 2019-2020 (heating season). Interestingly, the 2019-2020 heating season contains a network-wide data discontinuity. Whilst, October and November 2019 provide comparable coverage, December 2019 provides only 361 hours records across 183 sensor-location pairs with no daily observations that reach the minimum requirement of 18 valid hours. Furthermore, no observations are available from January to March 2020. 
+
+```text
+HOURLY RECORDS AND QC
+  month  hourly_records  reporting_pairs  valid_hours  qc_source_code_failed  qc_range_failed  qc_spread_failed
+2019-10          131242              193       124978                   4965                0              1798
+2019-11          125406              202       115793                   6533                0              4575
+2019-12             361              183          160                    200                0                32
+2020-01               0                0            0                      0                0                 0
+2020-02               0                0            0                      0                0                 0
+2020-03               0                0            0                      0                0                 0
+```
+Due to time constraints that pertain this work, further investigation of this anomaly will not be conducted. Valid observations from October and November 2019 will be retained. The missing PM₂.₅ observations will not imputed downstream, and the incomplete season will not be used as an independent validation period further on in this work. 
+
+Post-intervention coverage is considerably stronger. January–March 2025 period, 259 pairs met the 60% completeness threshold. During October 2025–March 2026, 212 pairs met the threshold. Median completeness among reporting pairs was 90.0% and 95.6%, respectively. In total, 202 pairs met the threshold during both post-intervention periods. By contrast, the aggregate pre-intervention period from 2018 - 2024, median completeness was 48.3%, 
+
+```text
+Pairs meeting 50%: 202 / 423
+Pairs meeting 60%: 145 / 423
+Pairs meeting 70%: 90 / 423
+```
+
+The 60% threshold came about as a comprise between temporal completeness and sensor retention. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-internvtion period and post-intervention period. 
+
 
