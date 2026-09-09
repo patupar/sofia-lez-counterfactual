@@ -351,3 +351,25 @@ Although the observed distribution, at least one sensor-location pair exist per 
 
 ## 4. Meteorological Data Extraction and Processing
 
+## 4. Meteorological Data
+
+**Output scripts/06_download_era5 and 07_prepare_predictors** [07. - 09.09.2026]
+
+ERA5 hourly single-level data was downloaded in 101 monthly chunks covering the required period and its temporal buffer. Monthly requests were used to satisfy the maximum monthly range -> CDS request limit. All requested chunks were downloaded, validated and retained locally.
+
+```text
+ERA5 chunks: 101
+Stable sensor-location pairs: 77
+Daily predictor rows: 231,924
+Date range: 2018-01-01 to 2026-03-31
+Duplicate sensor-days: 0
+Missing meteorological values: 0
+```
+
+Each of the 77 stable sensor-location pairs are assigned to its nearest ERA5 grid cell. In total, the sensors were represented by five 0.25° grid cells. The meteorological variables therefore describe broader conditions across Sofia rather than neighbourhood-scale differences. The spatial mismatch this brings about for some of the LEZ administrative districts should be considered in later interpretation of the results.   
+
+Hourly observations are aggregated to Sofia local calendar days. All dates contain the expected 23, 24 or 25 observations, including the daylight-saving transitions. The resulting predictor dataset forms a complete panel of 3,012 days for each sensor-location pair.
+
+The 112,728 missing values in `heating_season` are expected: the variable is defined only for the October–March heating period, leaving dates between April and September unassigned. No missing values are observed among the meteorological predictors. The dataset can therefore be taken forward for construction of the model table.
+
+
