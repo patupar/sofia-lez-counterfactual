@@ -349,4 +349,5 @@ Most sensor-location pairs are concentrated in the central, western and southern
 
 Although the observed distribution, at least one sensor-location pair exist per LEZ district. No changes to sensor pre-processing will be taken. Remains however important to take note of in later interpretation, in combination with further validation and spatial diagnostics. 
 
-## 4. Meteorological Data
+## 4. Meteorological Data Extraction and Processing
+
