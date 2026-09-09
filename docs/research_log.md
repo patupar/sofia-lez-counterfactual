@@ -317,9 +317,14 @@ HOURLY RECORDS AND QC
 2020-02               0                0            0                      0                0                 0
 2020-03               0                0            0                      0                0                 0
 ```
-Due to time constraints that pertain this work, further investigation of this anomaly will not be conducted. Valid observations from October and November 2019 will be retained. The missing PM₂.₅ observations will not imputed downstream, and the incomplete season will not be used as an independent validation period further on in this work. 
+Due to time constraints that pertain this work, further investigation of this anomaly will not be conducted. Valid observations
+from October and November 2019 will be retained. The missing PM₂.₅ observations will not imputed downstream, and the incomplete 
+season will not be used as an independent validation period further on in this work. 
 
-Post-intervention coverage is considerably stronger. January–March 2025 period, 259 pairs met the 60% completeness threshold. During October 2025–March 2026, 212 pairs met the threshold. Median completeness among reporting pairs was 90.0% and 95.6%, respectively. In total, 202 pairs met the threshold during both post-intervention periods. By contrast, the aggregate pre-intervention period from 2018 - 2024, median completeness was 48.3%, 
+Post-intervention coverage is considerably stronger. January–March 2025 period, 259 pairs met the 60% completeness threshold. 
+During October 2025–March 2026, 212 pairs met the threshold. Median completeness among reporting pairs was 90.0% and 95.6%, 
+respectively. In total, 202 pairs met the threshold during both post-intervention periods. By contrast, the aggregate 
+pre-intervention period from 2018 - 2024, median completeness was 48.3%, 
 
 ```text
 Pairs meeting 50%: 202 / 423
@@ -327,7 +332,9 @@ Pairs meeting 60%: 145 / 423
 Pairs meeting 70%: 90 / 423
 ```
 
-The 60% threshold came about as a comprise between temporal completeness and sensor retention. Seeing that still 145/423 passed the 60% threshold, it will not be relaxed. A sensor-location pair will be included in the stable panel when it meets this threshold across both the aggregate pre-intervention period and both post-intervention periods.
+The 60% threshold came about as a comprise between temporal completeness and sensor retention. Seeing that still 145/423 
+passed the 60% threshold, it will not be relaxed. A sensor-location pair will be included in the stable panel when it 
+meets this threshold across both the aggregate pre-intervention period and both post-intervention periods.
 
 From here, final panel selection will be performed by script/05_select_stable_panel.py
 
@@ -339,15 +346,29 @@ Pairs passing post_2025_jan_mar: 259
 Pairs passing post_2025_oct_mar: 212
 Pairs passing all criteria: 77
 ```
-Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of the original candidates. These pairs do not necessarily provide uninterrupted observations throughout the study period. Rather, each pair meets three separate completeness criteria: at least 60% across the pooled pre-intervention period from 2018 to 2024, at least 60% during January–March 2025, and at least 60% during October 2025–March 2026. As model training will be restricted to the heating months, their pre-intervention heating-month coverage was also inspected. Mean completeness was 72.4% and median completeness was 69.5%. Of the 77 pairs, 71 met the 60% threshold and all met at least 50%, corresponding to a minimum of 655 valid sensor-days -> decision: existing panel will therefore be retained.
+Final stable panel contains 77 sensor-location pairs -> corresponds to 18.2% of the original candidates. These pairs 
+do not necessarily provide uninterrupted observations throughout the study period. Rather, each pair meets three separate 
+completeness criteria: at least 60% across the pooled pre-intervention period from 2018 to 2024, at least 60% during 
+January–March 2025, and at least 60% during October 2025–March 2026. As model training will be restricted to the heating 
+months, their pre-intervention heating-month coverage was also inspected. Mean completeness was 72.4% and median 
+completeness was 69.5%. Of the 77 pairs, 71 met the 60% threshold and all met at least 50%, corresponding to a minimum 
+of 655 valid sensor-days -> decision: existing panel will therefore be retained.
 
-Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology and/or interpretation later on. 
+Before model construction their spatial distribution will assessed, to inform, if necessary changes in the methodology 
+and/or interpretation later on. 
 
 [**Spatial distribution of stable panel sensors**](outputs/figures/stable_panel_sensors.pdf) 
 
-Most sensor-location pairs are concentrated in the central, western and southern districts, with observations located both within and outside the nine districts covered by the residential-heating LEZ. The northern and outer parts of the municipality remain sparsely represented. The panel therefore captures different parts of Sofia's urban area, but cannot be considered spatially representative of the municipality as a whole. Within the districts covered by the LEZ, the retained sensor-location pairs are also unevenly distributed. They appear more concentrated in the southwestern and southern districts, while the northern LEZ districts contain fewer locations.
+Most sensor-location pairs are concentrated in the central, western and southern districts, with observations 
+located both within and outside the nine districts covered by the residential-heating LEZ. The northern and
+outer parts of the municipality remain sparsely represented. The panel therefore captures different parts of Sofia's
+urban area, but cannot be considered spatially representative of the municipality as a whole. Within the districts
+covered by the LEZ, the retained sensor-location pairs are also unevenly distributed. They appear more concentrated 
+in the southwestern and southern districts, while the northern LEZ districts contain fewer locations.
 
-Although the observed distribution, at least one sensor-location pair exist per LEZ district. No changes to sensor pre-processing will be taken. Remains however important to take note of in later interpretation, in combination with further validation and spatial diagnostics. 
+Although the observed distribution, at least one sensor-location pair exist per LEZ district. No changes to sensor 
+pre-processing will be taken. Remains however important to take note of in later interpretation, in combination 
+with further validation and spatial diagnostics. 
 
 ## 4. Meteorological Data Extraction and Processing
 
@@ -355,7 +376,9 @@ Although the observed distribution, at least one sensor-location pair exist per 
 
 **Output scripts/06_download_era5 and 07_prepare_predictors** [07. - 09.09.2026]
 
-ERA5 hourly single-level data was downloaded in 101 monthly chunks covering the required period and its temporal buffer. Monthly requests were used to satisfy the maximum monthly range -> CDS request limit. All requested chunks were downloaded, validated and retained locally.
+ERA5 hourly single-level data was downloaded in 101 monthly chunks covering the required period and its temporal 
+buffer. Monthly requests were used to satisfy the maximum monthly range -> CDS request limit. All requested chunks 
+were downloaded, validated and retained locally.
 
 ```text
 ERA5 chunks: 101
@@ -366,25 +389,38 @@ Duplicate sensor-days: 0
 Missing meteorological values: 0
 ```
 
-Each of the 77 stable sensor-location pairs are assigned to its nearest ERA5 grid cell. In total, the sensors were represented by five 0.25° grid cells. The meteorological variables therefore describe broader conditions across Sofia rather than neighbourhood-scale differences. The spatial mismatch this brings about for some of the LEZ administrative districts should be considered in later interpretation of the results.   
+Each of the 77 stable sensor-location pairs are assigned to its nearest ERA5 grid cell. In total, the sensors
+were represented by five 0.25° grid cells. The meteorological variables therefore describe broader conditions 
+across Sofia rather than neighbourhood-scale differences. The spatial mismatch this brings about for some of 
+the LEZ administrative districts should be considered in later interpretation of the results.   
 
-Hourly observations are aggregated to Sofia local calendar days. All dates contain the expected 23, 24 or 25 observations, including the daylight-saving transitions. The resulting predictor dataset forms a complete panel of 3,012 days for each sensor-location pair.
+Hourly observations are aggregated to Sofia local calendar days. All dates contain the expected 23, 24 or 25 
+observations, including the daylight-saving transitions. The resulting predictor dataset forms a complete 
+panel of 3,012 days for each sensor-location pair.
 
-The 112,728 missing values in `heating_season` are expected: the variable is defined only for the October–March heating period, leaving dates between April and September unassigned. No missing values are observed among the meteorological predictors. The dataset can therefore be taken forward for construction of the model table.
+The 112,728 missing values in `heating_season` are expected: the variable is defined only for the 
+October–March heating period, leaving dates between April and September unassigned. No missing values 
+are observed among the meteorological predictors. The dataset can therefore be taken forward for construction 
+of the model table.
 
 ### 4.2 Random Forest workflow design [09.09.2026]
 
-Model training and validation will only use QC-valid observations from the pre-LEZ heating
+Model training and validation only use QC-valid observations from the pre-LEZ heating
 months. Validation will use later blocked heating periods rather than a random split of individual
-sensor-days, as neighbouring dates in a random split would provide an overly optimistic result.
-The Random Forest will be tuned according to MAE and additionally evaluated using RMSE, R² and
+sensor-days, as neighbouring dates in a random split are expected to provide an optimistic result.
+The Random Forest (RF) will be tuned according to MAE and additionally evaluated using RMSE, R² and
 mean error. Three complete heating seasons between October 2021 and March 2024 will be used as
-expanding validation blocks. All available earlier heating-month observations, beginning in 2018,
+expanding validation blocks. 2019-2020 heating season due to the previously described data discontinuity
+(see section 3.2).  All available earlier heating-month observations, beginning in 2018,
 remain part of the corresponding training blocks.
 
 October–December 2024 will be retained as a recent pre-LEZ test period. It will be assessed only
 after parameter selection and will therefore not receive the same tuning weight as a complete
-six-month heating season. A sensor-specific historical mean will provide a simple benchmark.
-After validation and testing, the final model will be fitted to all accepted pre-LEZ heating-month
-observations, including autumn 2024. Post-LEZ PM₂.₅ observations will not be used for tuning or
-fitting and remain reserved for comparison against the no-LEZ predictions.
+six-month heating season. This was decided as the heating period 2024/2025 ends on 31.12.2024 with the
+succeeding period January-March 2025 already belonging to the post-LEZ period. This early-winter range
+should not influence hyperparameter selection. It only test model performance on the most recent
+pre-LEZ observations. 
+
+A sensor-specific historical mean will provide a simple benchmark. After validation and testing, the final
+model will be fitted to all accepted pre-LEZ heating-month observations, including autumn 2024. Post-LEZ PM₂.₅ 
+observations will not be used for tuning or fitting and remain reserved for comparison against the no-LEZ predictions.
