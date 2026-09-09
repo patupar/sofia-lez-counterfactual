@@ -351,7 +351,7 @@ Although the observed distribution, at least one sensor-location pair exist per 
 
 ## 4. Meteorological Data Extraction and Processing
 
-## 4. Meteorological Data
+### 4.1 ERA5 retrieval and predictor preparation
 
 **Output scripts/06_download_era5 and 07_prepare_predictors** [07. - 09.09.2026]
 
@@ -372,4 +372,19 @@ Hourly observations are aggregated to Sofia local calendar days. All dates conta
 
 The 112,728 missing values in `heating_season` are expected: the variable is defined only for the October–March heating period, leaving dates between April and September unassigned. No missing values are observed among the meteorological predictors. The dataset can therefore be taken forward for construction of the model table.
 
+### 4.2 Random Forest workflow design [09.09.2026]
 
+Model training and validation will only use QC-valid observations from the pre-LEZ heating
+months. Validation will use later blocked heating periods rather than a random split of individual
+sensor-days, as neighbouring dates in a random split would provide an overly optimistic result.
+The Random Forest will be tuned according to MAE and additionally evaluated using RMSE, R² and
+mean error. Three complete heating seasons between October 2021 and March 2024 will be used as
+expanding validation blocks. All available earlier heating-month observations, beginning in 2018,
+remain part of the corresponding training blocks.
+
+October–December 2024 will be retained as a recent pre-LEZ test period. It will be assessed only
+after parameter selection and will therefore not receive the same tuning weight as a complete
+six-month heating season. A sensor-specific historical mean will provide a simple benchmark.
+After validation and testing, the final model will be fitted to all accepted pre-LEZ heating-month
+observations, including autumn 2024. Post-LEZ PM₂.₅ observations will not be used for tuning or
+fitting and remain reserved for comparison against the no-LEZ predictions.

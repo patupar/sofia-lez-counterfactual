@@ -1,4 +1,4 @@
-"""Command-line interface for the sensor and ERA5 predictor workflow."""
+"""Command-line interface for the Sofia LEZ counterfactual workflow."""
 
 from __future__ import annotations
 
@@ -12,6 +12,13 @@ from .daily import aggregate_daily
 from .downloader import download_archive
 from .manifest import build_manifest
 from .meteorology import download_era5, prepare_predictors
+from .modeling import (
+    build_model_table,
+    predict_counterfactual,
+    summarise_counterfactual,
+    train_random_forest,
+    validate_random_forest,
+)
 from .sensors import build_unified_hourly
 
 
@@ -80,6 +87,36 @@ def _predictors(config: dict) -> dict:
     }
 
 
+def _model_table(config: dict) -> dict:
+    table = build_model_table(config)
+    return {
+        "model_table_rows": len(table),
+        "training_rows": int(table["eligible_for_training"].sum()),
+        "output": str(config["paths"]["model_table"]),
+    }
+
+
+def _validate_model(config: dict) -> dict:
+    return validate_random_forest(config)
+
+
+def _train_model(config: dict) -> dict:
+    return train_random_forest(config)
+
+
+def _predict_counterfactual(config: dict) -> dict:
+    table = predict_counterfactual(config)
+    return {
+        "prediction_rows": len(table),
+        "observed_rows": int(table["observed_pm2_5"].notna().sum()),
+        "output": str(config["paths"]["predictions"]),
+    }
+
+
+def _summarise_results(config: dict) -> dict:
+    return summarise_counterfactual(config)
+
+
 COMMANDS: dict[str, Callable[[dict], dict]] = {
     "manifest": _manifest,
     "download": _download,
@@ -89,13 +126,36 @@ COMMANDS: dict[str, Callable[[dict], dict]] = {
     "select-panel": _panel,
     "download-era5": _download_era5,
     "prepare-predictors": _predictors,
+    "build-model-table": _model_table,
+    "validate-random-forest": _validate_model,
+    "train-random-forest": _train_model,
+    "predict-counterfactual": _predict_counterfactual,
+    "summarise-results": _summarise_results,
 }
+
+DATA_COMMANDS = [
+    "manifest",
+    "download",
+    "qc-hourly",
+    "aggregate-daily",
+    "completeness",
+    "select-panel",
+    "download-era5",
+    "prepare-predictors",
+]
+MODEL_COMMANDS = [
+    "build-model-table",
+    "validate-random-forest",
+    "train-random-forest",
+    "predict-counterfactual",
+    "summarise-results",
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sofia-lez",
-        description="Prepare the Sofia PM2.5 panel and its daily ERA5 predictors.",
+        description="Prepare the Sofia PM2.5 panel, predictors and counterfactual model.",
     )
     parser.add_argument("--config", default="configs/pipeline.yaml", help="YAML configuration path")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -111,9 +171,14 @@ def build_parser() -> argparse.ArgumentParser:
                 "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
                 "download-era5": "download hourly ERA5 data for the stable-panel area",
                 "prepare-predictors": "prepare daily meteorological and temporal predictors",
+                "build-model-table": "join daily PM2.5 and predictors for the stable panel",
+                "validate-random-forest": "tune and assess the model in blocked time periods",
+                "train-random-forest": "fit the selected model to all pre-LEZ training rows",
+                "predict-counterfactual": "predict the no-LEZ post-intervention baseline",
+                "summarise-results": "summarise observed and counterfactual PM2.5",
             }[command],
         )
-    run = subparsers.add_parser("run", help="run the implemented data-preparation sequence")
+    run = subparsers.add_parser("run", help="run the configured workflow sequence")
     run.add_argument(
         "--skip-download",
         action="store_true",
@@ -129,17 +194,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="use already cached ERA5 files when the predictor stages are included",
     )
+    run.add_argument(
+        "--include-modeling",
+        action="store_true",
+        help="run model-table construction, validation, training and prediction after Stage 7",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     config = load_config(args.config)
     if args.command in COMMANDS:
         print(json.dumps(COMMANDS[args.command](config), indent=2))
         return 0
 
-    steps = list(COMMANDS)
+    steps = list(DATA_COMMANDS)
     if args.skip_download:
         steps.remove("download")
     if not args.include_provisional_panel:
@@ -147,6 +218,10 @@ def main(argv: list[str] | None = None) -> int:
             steps.remove(step)
     elif args.skip_era5_download:
         steps.remove("download-era5")
+    if args.include_modeling:
+        if not args.include_provisional_panel:
+            parser.error("--include-modeling requires --include-provisional-panel")
+        steps.extend(MODEL_COMMANDS)
     summary = {}
     for step in steps:
         print(f"[{step}]", flush=True)

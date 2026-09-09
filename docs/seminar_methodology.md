@@ -272,10 +272,18 @@ information from the corresponding observation period.
 
 ### 4.1 Model table
 
-The model table contains [t.b.d.].
-Daily PM₂.₅ is the response variable. Predictor columns contain meteorological conditions, 
-temporal variables and sensor coordinates. Only daily observations from the stable panel 
-with `daily_qc_pass == True` enter the model.
+`scripts/08_build_model_table.py` joins the complete stable-panel predictor table to the daily
+sensor observations using `location_id`, `sensor_id` and local date. Daily PM₂.₅ is the response
+variable. The predictors are the eight meteorological variables, the sine and cosine of day of
+year, weekday, latitude and longitude listed in `configs/model.yaml`. Sensor and location
+identifiers are retained for grouping and checking but are not treated as continuous model
+inputs.
+
+The join begins from the predictor table. Consequently, the model table retains one row for every
+stable sensor-location pair and date even where no valid PM₂.₅ observation is available. The
+response remains missing when the sensor-day is unavailable or fails daily QC; it is never
+imputed. `eligible_for_training` identifies the QC-valid pre-LEZ heating-month rows which can enter
+model fitting.
 
 Data-dependent preprocessing and model choices are based only on pre-LEZ training data. 
 Observed post-LEZ PM₂.₅ values do not influence model development and are reserved for 
@@ -291,18 +299,49 @@ to the heating-season months represented in the counterfactual periods. The mode
 relationship between PM₂.₅ and the predictor variables under pre-LEZ
 conditions. Post-LEZ PM₂.₅ observations are excluded from training.
 
-The model configuration records the predictor list, random seed and fitted parameters. The
-trained model is saved to `models/random_forest.joblib`.
+No feature scaling is applied because the Random Forest makes tree splits within each predictor
+and does not depend on distances between differently scaled variables. The estimator remains in a
+scikit-learn `Pipeline` so that tuning and final fitting use one reproducible model object. The
+configuration records the predictor list, random seed, search space and fitted parameters. The
+trained pipeline is saved to `models/random_forest.joblib`, accompanied by model metadata and a
+table of impurity-based feature importance.
 
 ### 4.3 Model tuning and validation
 
 Validation uses blocked time periods rather than a random split of individual sensor-days. This
 prevents neighbouring dates from appearing in both training and validation data. Only 
-observations from January-March and October December are included. Tuning compares candidate values
-for the number of trees, maximum tree depth, number of candidate features and minimum leaf size.
+observations from January–March and October–December are included. The training window expands
+forward through time while each validation block remains later than its corresponding training
+data:
 
-[ToDo remark: Elaborate validation design: e.g. exact train/val blocks / hyperparamter tuning 
-/ model for simple benchmark / performance: overall/SensorBySensor? / mean prediction error]
+| Fold | Expanding training period | Validation block |
+|---|---|---|
+| `heating_2021_2022` | Heating months from 1 January 2018–31 March 2021 | 1 October 2021–31 March 2022 |
+| `heating_2022_2023` | Heating months from 1 January 2018–31 March 2022 | 1 October 2022–31 March 2023 |
+| `heating_2023_2024` | Heating months from 1 January 2018–31 March 2023 | 1 October 2023–31 March 2024 |
+
+The April–September gap prevents parts of the same heating season from being placed on both sides
+of a split. The incomplete 2019–2020 season is not used as its own validation block. All dates and
+fold boundaries are explicit in `configs/model.yaml`.
+
+`scripts/09_validate_random_forest.py` uses `RandomizedSearchCV` to compare candidate values for
+the number of trees, maximum tree depth, number of candidate features and minimum leaf size. The
+search evaluates 16 reproducibly sampled parameter sets and selects the set with the lowest mean
+absolute error across the blocked folds. It is limited to 16 sets to keep the computation
+practical while testing all four controls. Model fitting takes place separately within each fold.
+
+After parameter selection, the selected model is fitted to heating-month observations through
+31 March 2024 and tested once on 1 October–31 December 2024. This recent pre-LEZ period is kept
+outside the parameter search. It therefore does not receive the same tuning weight as a complete
+six-month heating season. After this test, `scripts/10_train_random_forest.py` fits the final model
+again using all accepted pre-LEZ heating-month observations, including October–December 2024.
+
+The Random Forest is also compared with a simple benchmark which predicts each sensor-location
+pair's mean PM₂.₅ from the corresponding training block. If a pair has no accepted training value
+in an early fold, the overall training mean is used for that pair. This shows whether the fitted
+model improves upon a fixed historical sensor level. The sensor means and fallback mean are
+recalculated inside every fold from that fold's training rows only. Validation and test PM₂.₅
+values therefore cannot influence their own benchmark predictions.
 
 **Note:** Spatial hold-out validation is omitted from the methodology at this point. The model 
 predicts later observations for the same stable sensor location pairs rather than at previously
@@ -310,8 +349,18 @@ unseen locations.
 
 Mean absolute error (MAE) is the primary validation measure. Root mean squared error (RMSE)
 shows sensitivity to large errors, and the coefficient of determination (R²) describes the
-explained variation. The selected parameter set is fitted again using all accepted pre-LEZ
-training records.
+explained variation. Mean error, calculated as prediction minus observation, reports systematic
+over- or under-prediction. Metrics are written for every fold, for all out-of-block predictions
+combined, and separately for October–December and January–March. A second table reports the same
+measures for each sensor-location pair so that poor performance at individual locations is not
+hidden by the overall result. The autumn 2024 test metrics and predictions are stored separately
+from the validation outputs.
+
+No calendar-year trend is supplied to the Random Forest. The counterfactual therefore assumes
+that the pre-LEZ relationship between PM₂.₅, weather, season and location remains sufficiently
+stable during the post-intervention periods. Changes in error across the ordered validation folds
+provide a diagnostic for possible temporal drift, but may also reflect differences between
+winters or the observation sources.
 
 ### 4.4 No-LEZ baseline prediction
 
@@ -325,9 +374,20 @@ The counterfactual periods are:
 - 1 October 2025–31 March 2026.
 
 The prediction table retains observed PM2.5, predicted no-LEZ PM₂.₅, date and sensor-location
-identifiers. This supports comparisons by date, sensor and administrative district.
+identifiers. Predictions are produced for every stable-pair predictor row in the two periods,
+including dates on which the observed PM₂.₅ response is missing. Observed-minus-predicted
+differences are calculated only where a QC-valid observation exists. This supports comparisons by
+date and sensor-location pair without replacing missing observations.
 
 ## 5. Anomaly assessment
+
+`scripts/12_summarise_results.py` aggregates the post-LEZ prediction table by counterfactual
+period, local date and sensor-location pair. Each output reports the total number of predicted
+rows, the number and coverage of comparable observed rows, the observed and predicted means on
+those same rows, and the observed-minus-predicted absolute and relative difference. A separate
+predicted mean across all rows is retained so that incomplete observation coverage remains
+visible. These differences describe departure from the fitted no-LEZ baseline; they are not by
+themselves proof that the LEZ caused the departure.
 
 ## 6. Code and data reference
 The table below links each methodological step to its relevant script, module and resulting 
@@ -340,13 +400,20 @@ output.
 | Prepare hourly and daily observations | `scripts/03_prepare_sensor_observations.py` | `sensors.py`, `qc.py`, `daily.py` | Unified hourly and daily PM2.5 tables |
 | Calculate completeness | `scripts/04_check_sensor_completeness.py` | `completeness.py` | Sensor-year and sensor-season tables |
 | Select stable panel | `scripts/05_select_stable_panel.py` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
-| Retrieve ERA5 | `scripts/06_download_era5.py` | `meteorology.py` | Yearly NetCDF chunks and `download_ledger.jsonl` |
+| Retrieve ERA5 | `scripts/06_download_era5.py` | `meteorology.py` | Monthly NetCDF chunks and `download_ledger.jsonl` |
 | Prepare predictors | `scripts/07_prepare_predictors.py` | `meteorology.py` | `data/interim/predictors/daily_predictors.csv` |
+| Build model table | `scripts/08_build_model_table.py` | `modeling.py` | `data/processed/model_table.csv` |
+| Tune, validate and test Random Forest | `scripts/09_validate_random_forest.py` | `modeling.py` | Validation, recent-test and tuning outputs |
+| Train final Random Forest | `scripts/10_train_random_forest.py` | `modeling.py` | `models/random_forest.joblib` and model metadata |
+| Predict no-LEZ baseline | `scripts/11_predict_counterfactual.py` | `modeling.py` | `data/processed/counterfactual_predictions.csv` |
+| Summarise results | `scripts/12_summarise_results.py` | `modeling.py` | Period, date and sensor-location summary tables |
 
-All entry points read `configs/pipeline.yaml`. `pyproject.toml` defines the Python dependencies.
-`sample_data/` contains synthetic data for `tests/test_pipeline.py` where  spatial filter, archive
-URL patterns, manifest construction, source combination, completeness rules and daily
-aggregation were tested. 
+All entry points read `configs/pipeline.yaml`, which points to the model specification in
+`configs/model.yaml`. `pyproject.toml` defines the Python dependencies.
+`sample_data/` contains synthetic data for `tests/test_pipeline.py`, while
+`tests/test_modeling.py` generates a small multi-season panel during the test. The offline tests
+cover spatial filtering, archive URL patterns, manifest construction, source combination,
+completeness, daily aggregation and all five model stages without contacting external services.
 
 ## 7. References
 

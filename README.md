@@ -72,12 +72,17 @@ python scripts/04_check_sensor_completeness.py --config configs/pipeline.yaml
 python scripts/05_select_stable_panel.py --config configs/pipeline.yaml
 python scripts/06_download_era5.py --config configs/pipeline.yaml
 python scripts/07_prepare_predictors.py --config configs/pipeline.yaml
+python scripts/08_build_model_table.py --config configs/pipeline.yaml
+python scripts/09_validate_random_forest.py --config configs/pipeline.yaml
+python scripts/10_train_random_forest.py --config configs/pipeline.yaml
+python scripts/11_predict_counterfactual.py --config configs/pipeline.yaml
+python scripts/12_summarise_results.py --config configs/pipeline.yaml
 ```
 
 Or run the complete sequence:
 
 ```bash
-sofia-lez --config configs/pipeline.yaml run --include-provisional-panel
+sofia-lez --config configs/pipeline.yaml run --include-provisional-panel --include-modeling
 ```
 
 Use `--skip-download` when the Sensor.Community archive is already cached and
@@ -95,15 +100,15 @@ Use `--skip-download` when the Sensor.Community archive is already cached and
 | Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
 | ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible monthly hourly ERA5 NetCDF chunks for the stable-panel extent |
 | Predictor preparation | `data/interim/predictors/daily_predictors.csv` | Match ERA5 grid cells to stable pairs and aggregate weather to Sofia local days |
+| Model-table construction | `data/processed/model_table.csv` | Join the complete predictor panel to available QC-valid daily PM₂.₅ observations |
+| Model validation and test | validation metrics, test metrics and tuning results | Tune with three complete blocked heating seasons, then test once on autumn 2024 |
+| Final model | `models/random_forest.joblib` | Fit the selected Random Forest to all accepted 2018–2024 heating-month observations |
+| Counterfactual prediction | `data/processed/counterfactual_predictions.csv` | Predict the two post-LEZ periods using observed weather and temporal conditions |
+| Result summary | tables under `outputs/tables/` | Compare observed and predicted PM₂.₅ by period, date and sensor-location pair |
 
-The subsequent workflow will:
-
-1. construct the daily model table;
-2. tune and validate the Random Forest model;
-3. train the selected model on pre-LEZ heating periods;
-4. predict the post-LEZ no-intervention baseline; and
-5. compare observed and predicted PM₂.₅ concentrations.
-[...]
+`configs/model.yaml` records the response, predictor list, blocked validation dates, recent test
+period, random seed and hyperparameter search. The post-LEZ response is never used for model
+selection or fitting.
 
 ## Documentation
 The repository contains two complementary records:
