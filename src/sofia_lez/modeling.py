@@ -1,4 +1,4 @@
-"""Random Forest validation, training and counterfactual prediction."""
+"""Model validation, selection, training and counterfactual prediction."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import pandas as pd
 import sklearn
 import yaml
 from sklearn.base import clone
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 
 from .config import ensure_parent
@@ -40,6 +40,9 @@ def _model_settings(config: dict) -> dict[str, Any]:
         raise ValueError("The recent test period must remain within the training period")
     if settings["validation"].get("benchmark") != "sensor_mean":
         raise ValueError("The supported validation benchmark is 'sensor_mean'")
+    rf_grid = settings.get("random_forest", {}).get("search", {}).get("parameter_grid")
+    if not rf_grid or any(not values for values in rf_grid.values()):
+        raise ValueError("random_forest must define a non-empty parameter grid")
     return settings
 
 
@@ -179,6 +182,14 @@ def _random_forest_pipeline(settings: dict[str, Any], n_jobs: int) -> Pipeline:
         n_jobs=n_jobs,
     )
     return Pipeline([("model", forest)])
+
+
+def _gradient_boosting_pipeline(settings: dict[str, Any]) -> Pipeline:
+    model = HistGradientBoostingRegressor(
+        random_state=int(settings["gradient_boosting"]["random_state"]),
+        early_stopping=False,
+    )
+    return Pipeline([("model", model)])
 
 
 def _blocked_splits(
@@ -339,43 +350,238 @@ def _season_part_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def validate_random_forest(config: dict) -> dict[str, Any]:
-    """Tune the Random Forest with pre-LEZ blocked temporal validation."""
-    settings = _model_settings(config)
-    observations = _training_observations(_read_model_table(config, settings), settings)
-    features = list(settings["predictors"])
-    target = settings["target"]
-    splits, fold_details = _blocked_splits(observations, settings)
-    search_settings = settings["random_forest"]["search"]
-    distributions = search_settings["parameter_distributions"]
-    combinations = int(np.prod([len(values) for values in distributions.values()]))
-    iterations = min(int(search_settings["n_iter"]), combinations)
+def _metrics_by_month(
+    predictions: pd.DataFrame,
+    period_column: str,
+    row_count_column: str,
+) -> pd.DataFrame:
+    """Summarise observed values, predictions and residuals by calendar month."""
+    table = predictions.copy()
+    table["year_month"] = table["date"].dt.to_period("M").astype(str)
+    rows = []
+    for (period, year_month), group in table.groupby(
+        [period_column, "year_month"], sort=False
+    ):
+        for model_name, prediction_column in (
+            ("random_forest", "rf_predicted_pm2_5"),
+            ("sensor_mean_benchmark", "sensor_mean_predicted_pm2_5"),
+        ):
+            rows.append(
+                {
+                    period_column: period,
+                    "year_month": year_month,
+                    "model": model_name,
+                    row_count_column: len(group),
+                    "observed_mean": float(group["observed_pm2_5"].mean()),
+                    "predicted_mean": float(group[prediction_column].mean()),
+                    **_regression_metrics(group["observed_pm2_5"], group[prediction_column]),
+                }
+            )
+    return pd.DataFrame(rows)
 
-    search = RandomizedSearchCV(
-        estimator=_random_forest_pipeline(settings, n_jobs=1),
-        param_distributions=distributions,
-        n_iter=iterations,
-        scoring=settings["validation"]["scoring"],
+
+def _predictor_shift(
+    training: pd.DataFrame,
+    evaluation: pd.DataFrame,
+    period_type: str,
+    period_name: str,
+    predictors: list[str],
+) -> list[dict[str, Any]]:
+    """Compare predictor distributions in training and later evaluation data."""
+    rows = []
+    for predictor in predictors:
+        training_mean = float(training[predictor].mean())
+        training_std = float(training[predictor].std())
+        evaluation_mean = float(evaluation[predictor].mean())
+        rows.append(
+            {
+                "period_type": period_type,
+                "period": period_name,
+                "predictor": predictor,
+                "training_rows": len(training),
+                "evaluation_rows": len(evaluation),
+                "training_mean": training_mean,
+                "training_std": training_std,
+                "evaluation_mean": evaluation_mean,
+                "evaluation_std": float(evaluation[predictor].std()),
+                "mean_difference": evaluation_mean - training_mean,
+                "standardised_mean_difference": (
+                    (evaluation_mean - training_mean) / training_std
+                    if training_std > 0
+                    else np.nan
+                ),
+            }
+        )
+    return rows
+
+
+def _candidate_table(search: GridSearchCV, fold_details: list[dict[str, Any]]) -> pd.DataFrame:
+    """Create an inspectable table of training and validation error for every candidate."""
+    raw = pd.DataFrame(search.cv_results_)
+    table = pd.DataFrame(
+        {
+            "validation_rank": raw["rank_test_mae"].astype(int),
+            "mean_validation_mae": -raw["mean_test_mae"],
+            "std_validation_mae": raw["std_test_mae"],
+            "se_validation_mae": raw["std_test_mae"] / np.sqrt(len(fold_details)),
+            "mean_validation_rmse": -raw["mean_test_rmse"],
+            "mean_validation_r2": raw["mean_test_r2"],
+            "mean_training_mae": -raw["mean_train_mae"],
+            "training_validation_gap": -raw["mean_test_mae"] + raw["mean_train_mae"],
+            "mean_fit_time_seconds": raw["mean_fit_time"],
+            "parameters_json": [json.dumps(params, sort_keys=True) for params in raw["params"]],
+        }
+    )
+    for index, fold in enumerate(fold_details):
+        name = fold["name"]
+        table[f"validation_mae__{name}"] = -raw[f"split{index}_test_mae"]
+        table[f"validation_rmse__{name}"] = -raw[f"split{index}_test_rmse"]
+        table[f"validation_r2__{name}"] = raw[f"split{index}_test_r2"]
+        table[f"training_mae__{name}"] = -raw[f"split{index}_train_mae"]
+    parameter_columns = [column for column in raw if column.startswith("param_")]
+    for column in parameter_columns:
+        table[column] = raw[column]
+    table = table.sort_values(
+        ["mean_validation_mae", "training_validation_gap", "parameters_json"],
+        kind="stable",
+    ).reset_index(drop=True)
+    table.insert(0, "candidate_rank", np.arange(1, len(table) + 1))
+    best_standard_error = float(table.loc[0, "se_validation_mae"])
+    threshold = float(table.loc[0, "mean_validation_mae"]) + best_standard_error
+    table["within_one_standard_error"] = table["mean_validation_mae"].le(threshold)
+    return table
+
+
+def _run_grid_search(
+    observations: pd.DataFrame,
+    settings: dict[str, Any],
+    model_family: str,
+) -> tuple[pd.DataFrame, list[tuple[np.ndarray, np.ndarray]], list[dict[str, Any]]]:
+    splits, fold_details = _blocked_splits(observations, settings)
+    search_settings = settings[model_family]["search"]
+    parameter_grid = search_settings.get("parameter_grid")
+    if not parameter_grid or any(not values for values in parameter_grid.values()):
+        raise ValueError(f"{model_family} must define a non-empty parameter grid")
+    if model_family == "random_forest":
+        estimator = _random_forest_pipeline(settings, n_jobs=1)
+    elif model_family == "gradient_boosting":
+        estimator = _gradient_boosting_pipeline(settings)
+    else:
+        raise ValueError(f"Unsupported model family: {model_family}")
+    search = GridSearchCV(
+        estimator=estimator,
+        param_grid=parameter_grid,
+        scoring={
+            "mae": settings["validation"]["scoring"],
+            "rmse": "neg_root_mean_squared_error",
+            "r2": "r2",
+        },
         cv=splits,
         refit=False,
-        random_state=int(settings["random_forest"]["random_state"]),
         n_jobs=int(search_settings["n_jobs"]),
         verbose=int(search_settings["verbose"]),
         return_train_score=True,
         error_score="raise",
     )
-    search.fit(observations[features], observations[target])
-    best_parameters = search.best_params_
+    features = list(settings["predictors"])
+    search.fit(observations[features], observations[settings["target"]])
+    return _candidate_table(search, fold_details), splits, fold_details
 
+
+def validate_random_forest(config: dict) -> dict[str, Any]:
+    """Evaluate all configured Random Forest candidates without selecting one."""
+    settings = _model_settings(config)
+    observations = _training_observations(_read_model_table(config, settings), settings)
+    tuning, _, fold_details = _run_grid_search(observations, settings, "random_forest")
+    search_id = pd.Timestamp.now(tz="UTC").isoformat()
+    tuning.insert(1, "search_id", search_id)
+    tuning.insert(2, "model_family", "random_forest")
+    _write_csv(tuning, config["paths"]["tuning_results"])
+    best = tuning.iloc[0]
+    return {
+        "training_rows": len(observations),
+        "validation_folds": len(fold_details),
+        "parameter_sets_tested": len(tuning),
+        "best_cv_mae": float(best["mean_validation_mae"]),
+        "lowest_mae_candidate_rank": int(best["candidate_rank"]),
+        "one_standard_error_candidates": int(tuning["within_one_standard_error"].sum()),
+        "tuning_results": str(config["paths"]["tuning_results"]),
+        "search_id": search_id,
+        "selection_required": True,
+    }
+
+
+def validate_gradient_boosting(config: dict) -> dict[str, Any]:
+    """Optionally compare Gradient Boosting candidates on the same blocked folds."""
+    settings = _model_settings(config)
+    if "gradient_boosting" not in settings:
+        raise ValueError("No optional gradient_boosting model is configured")
+    observations = _training_observations(_read_model_table(config, settings), settings)
+    tuning, _, fold_details = _run_grid_search(observations, settings, "gradient_boosting")
+    search_id = pd.Timestamp.now(tz="UTC").isoformat()
+    tuning.insert(1, "search_id", search_id)
+    tuning.insert(2, "model_family", "hist_gradient_boosting")
+    _write_csv(tuning, config["paths"]["gradient_boosting_tuning_results"])
+    best = tuning.iloc[0]
+    return {
+        "training_rows": len(observations),
+        "validation_folds": len(fold_details),
+        "parameter_sets_tested": len(tuning),
+        "best_cv_mae": float(best["mean_validation_mae"]),
+        "lowest_mae_candidate_rank": int(best["candidate_rank"]),
+        "one_standard_error_candidates": int(tuning["within_one_standard_error"].sum()),
+        "tuning_results": str(config["paths"]["gradient_boosting_tuning_results"]),
+        "search_id": search_id,
+    }
+
+
+def select_random_forest(
+    config: dict,
+    candidate_rank: int,
+    selection_reason: str,
+) -> dict[str, Any]:
+    """Record one RF candidate, then evaluate it on validation and recent holdout data."""
+    selection_reason = selection_reason.strip()
+    if not selection_reason:
+        raise ValueError("A validation-based selection reason is required")
+    settings = _model_settings(config)
+    observations = _training_observations(_read_model_table(config, settings), settings)
+    features = list(settings["predictors"])
+    target = settings["target"]
+    tuning_path = Path(config["paths"]["tuning_results"])
+    if not tuning_path.exists():
+        raise FileNotFoundError("Run Stage 9 RF candidate validation before selecting a model")
+    tuning = pd.read_csv(tuning_path)
+    required_tuning_columns = {"candidate_rank", "parameters_json", "search_id"}
+    missing_tuning_columns = sorted(required_tuning_columns - set(tuning.columns))
+    if missing_tuning_columns:
+        raise ValueError(
+            "The RF tuning table predates explicit candidate selection; rerun Stage 9"
+        )
+    search_ids = tuning["search_id"].dropna().unique()
+    if len(search_ids) != 1:
+        raise ValueError("The RF tuning table does not identify one reproducible search run")
+    search_id = str(search_ids[0])
+    candidate = tuning.loc[tuning["candidate_rank"].eq(candidate_rank)]
+    if len(candidate) != 1:
+        available = tuning["candidate_rank"].astype(int).tolist()
+        raise ValueError(f"Candidate rank {candidate_rank} is unavailable; choose from {available}")
+    candidate = candidate.iloc[0]
+    parameters = json.loads(candidate["parameters_json"])
+    splits, fold_details = _blocked_splits(observations, settings)
     prediction_tables = []
     metric_rows = []
+    shift_rows = []
     for (train_index, validation_index), fold in zip(splits, fold_details, strict=True):
         train = observations.loc[train_index]
         validation = observations.loc[validation_index]
-        model = clone(_random_forest_pipeline(settings, n_jobs=-1)).set_params(**best_parameters)
+        model = clone(_random_forest_pipeline(settings, n_jobs=-1)).set_params(**parameters)
         model.fit(train[features], train[target])
         rf_prediction = model.predict(validation[features])
         benchmark_prediction = _sensor_mean_prediction(train, validation, target)
+        shift_rows.extend(
+            _predictor_shift(train, validation, "validation", fold["name"], features)
+        )
 
         fold_predictions = validation[[*PAIR_COLUMNS, "date", target]].copy()
         fold_predictions.insert(0, "fold", fold["name"])
@@ -424,13 +630,41 @@ def validate_random_forest(config: dict) -> dict[str, Any]:
         pooled_name="all_validation_blocks",
     )
     season_part_metrics = _season_part_metrics(predictions)
+    validation_month_metrics = _metrics_by_month(
+        predictions,
+        period_column="fold",
+        row_count_column="validation_rows",
+    )
 
     test_train_index, test_index, test_details = _test_split(observations, settings)
+    selected = {
+        "selected_utc": pd.Timestamp.now(tz="UTC").isoformat(),
+        "holdout_evaluated_utc": None,
+        "search_id": search_id,
+        "model_family": "random_forest",
+        "candidate_rank": int(candidate_rank),
+        "selection_reason": selection_reason,
+        "scoring": settings["validation"]["scoring"],
+        "selected_cv_mae": float(candidate["mean_validation_mae"]),
+        "selected_cv_standard_deviation": float(candidate["std_validation_mae"]),
+        "selected_cv_standard_error": float(candidate["se_validation_mae"]),
+        "selected_cv_rmse": float(candidate["mean_validation_rmse"]),
+        "selected_cv_r2": float(candidate["mean_validation_r2"]),
+        "mean_training_mae": float(candidate["mean_training_mae"]),
+        "training_validation_gap": float(candidate["training_validation_gap"]),
+        "within_one_standard_error": str(candidate["within_one_standard_error"]).lower()
+        == "true",
+        "best_parameters": parameters,
+        "predictors": features,
+        "folds": fold_details,
+        "test_period": test_details,
+    }
+    # Persist the audited validation-based choice before reading the holdout response.
+    _write_json(selected, config["paths"]["selected_parameters"])
+
     test_train = observations.loc[test_train_index]
     test = observations.loc[test_index]
-    test_model = clone(_random_forest_pipeline(settings, n_jobs=-1)).set_params(
-        **best_parameters
-    )
+    test_model = clone(_random_forest_pipeline(settings, n_jobs=-1)).set_params(**parameters)
     test_model.fit(test_train[features], test_train[target])
     test_rf_prediction = test_model.predict(test[features])
     test_benchmark_prediction = _sensor_mean_prediction(test_train, test, target)
@@ -465,50 +699,38 @@ def validate_random_forest(config: dict) -> dict[str, Any]:
         period_column="test_period",
         row_count_column="test_rows",
     )
-
-    tuning = pd.DataFrame(search.cv_results_)
-    tuning["mean_validation_mae"] = -tuning["mean_test_score"]
-    tuning["std_validation_mae"] = tuning["std_test_score"]
-    tuning = tuning.sort_values("rank_test_score").reset_index(drop=True)
-    tuning_columns = [
-        "rank_test_score",
-        "mean_validation_mae",
-        "std_validation_mae",
-        "mean_train_score",
-        "mean_fit_time",
-        "params",
-        *(column for column in tuning if column.startswith("param_")),
-    ]
-    tuning = tuning[tuning_columns]
-
-    selected = {
-        "created_utc": pd.Timestamp.now(tz="UTC").isoformat(),
-        "scoring": settings["validation"]["scoring"],
-        "best_cv_mae": float(-search.best_score_),
-        "best_parameters": best_parameters,
-        "predictors": features,
-        "folds": fold_details,
-        "test_period": test_details,
-    }
+    test_month_metrics = _metrics_by_month(
+        test_predictions,
+        period_column="test_period",
+        row_count_column="test_rows",
+    )
+    shift_rows.extend(
+        _predictor_shift(test_train, test, "recent_holdout", test_details["name"], features)
+    )
     _write_csv(metrics, config["paths"]["validation_metrics"])
     _write_csv(sensor_metrics, config["paths"]["validation_metrics_by_sensor"])
     _write_csv(season_part_metrics, config["paths"]["validation_metrics_by_season_part"])
+    _write_csv(validation_month_metrics, config["paths"]["validation_metrics_by_month"])
     _write_csv(predictions, config["paths"]["validation_predictions"])
     _write_csv(test_metrics, config["paths"]["test_metrics"])
     _write_csv(test_sensor_metrics, config["paths"]["test_metrics_by_sensor"])
+    _write_csv(test_month_metrics, config["paths"]["test_metrics_by_month"])
     _write_csv(test_predictions, config["paths"]["test_predictions"])
-    _write_csv(tuning, config["paths"]["tuning_results"])
+    _write_csv(pd.DataFrame(shift_rows), config["paths"]["predictor_shift"])
+    selected["holdout_evaluated_utc"] = pd.Timestamp.now(tz="UTC").isoformat()
     _write_json(selected, config["paths"]["selected_parameters"])
     return {
         "training_rows": len(observations),
         "validation_folds": len(splits),
-        "parameter_sets_tested": iterations,
-        "best_cv_mae": float(-search.best_score_),
-        "best_parameters": best_parameters,
+        "candidate_rank": int(candidate_rank),
+        "selected_cv_mae": float(candidate["mean_validation_mae"]),
+        "parameters": parameters,
         "metrics": str(config["paths"]["validation_metrics"]),
         "test_period": test_details["name"],
         "test_rows": test_details["test_rows"],
         "test_metrics": str(config["paths"]["test_metrics"]),
+        "predictor_shift": str(config["paths"]["predictor_shift"]),
+        "selected_parameters": str(config["paths"]["selected_parameters"]),
     }
 
 
@@ -518,8 +740,34 @@ def train_random_forest(config: dict) -> dict[str, Any]:
     observations = _training_observations(_read_model_table(config, settings), settings)
     features = list(settings["predictors"])
     target = settings["target"]
-    with Path(config["paths"]["selected_parameters"]).open(encoding="utf-8") as handle:
+    selected_path = Path(config["paths"]["selected_parameters"])
+    if not selected_path.exists():
+        raise FileNotFoundError(
+            "No Random Forest candidate has been selected; run Stage 9b before training"
+        )
+    with selected_path.open(encoding="utf-8") as handle:
         selected = json.load(handle)
+    if selected.get("model_family") != "random_forest" or "candidate_rank" not in selected:
+        raise ValueError(
+            "The selected-parameter file predates explicit candidate selection; "
+            "rerun Stages 9 and 9b"
+        )
+    tuning_path = Path(config["paths"]["tuning_results"])
+    if not tuning_path.exists():
+        raise FileNotFoundError("The RF tuning table is missing; rerun Stages 9 and 9b")
+    current_tuning = pd.read_csv(tuning_path)
+    if "search_id" not in current_tuning:
+        raise ValueError("The RF tuning table predates Stage 9 candidate selection")
+    current_search_ids = current_tuning["search_id"].dropna().unique()
+    if len(current_search_ids) != 1 or selected.get("search_id") != str(
+        current_search_ids[0]
+    ):
+        raise ValueError(
+            "The selected candidate does not belong to the current Stage 9 search; "
+            "rerun Stage 9b"
+        )
+    if not selected.get("holdout_evaluated_utc"):
+        raise ValueError("The selected candidate has not completed recent-holdout evaluation")
     parameters = selected["best_parameters"]
 
     model = _random_forest_pipeline(
@@ -538,6 +786,8 @@ def train_random_forest(config: dict) -> dict[str, Any]:
             observations[["location_id", "sensor_id"]].drop_duplicates().shape[0]
         ),
         "parameters": parameters,
+        "selected_candidate_rank": int(selected["candidate_rank"]),
+        "selection_reason": selected["selection_reason"],
         "random_state": int(settings["random_forest"]["random_state"]),
         "scikit_learn_version": sklearn.__version__,
     }

@@ -324,17 +324,29 @@ The April–September gap prevents parts of the same heating season from being p
 of a split. The incomplete 2019–2020 season is not used as its own validation block. All dates and
 fold boundaries are explicit in `configs/model.yaml`.
 
-`scripts/09_validate_random_forest.py` uses `RandomizedSearchCV` to compare candidate values for
-the number of trees, maximum tree depth, number of candidate features and minimum leaf size. The
-search evaluates 16 reproducibly sampled parameter sets and selects the set with the lowest mean
-absolute error across the blocked folds. It is limited to 16 sets to keep the computation
-practical while testing all four controls. Model fitting takes place separately within each fold.
+`scripts/09_validate_random_forest.py` uses `GridSearchCV` to evaluate every configured
+combination of number of trees, maximum tree depth, number of candidate features and minimum leaf
+size. The current grid contains 54 candidates, each fitted on three blocked folds, resulting in
+162 fits. For every candidate the output records fold-specific and mean validation MAE, RMSE and
+R², training MAE, the training-validation MAE gap and fit time. It also marks candidates whose
+mean MAE falls within one standard error of the lowest-MAE candidate. Stage 9 does not select a
+model and does not evaluate October-December 2024.
 
-After parameter selection, the selected model is fitted to heating-month observations through
-31 March 2024 and tested once on 1 October–31 December 2024. This recent pre-LEZ period is kept
-outside the parameter search. It therefore does not receive the same tuning weight as a complete
-six-month heating season. After this test, `scripts/10_train_random_forest.py` fits the final model
-again using all accepted pre-LEZ heating-month observations, including October–December 2024.
+The candidate is fixed explicitly with `scripts/09b_select_random_forest.py`, using its rank in
+the Stage 9 table and a short written reason. This allows validation error, fold variability and
+the training-validation gap to be considered together instead of automatically accepting a
+marginal numerical winner. A search identifier links the selection to the exact Stage 9 run and
+prevents final training with a selection made from an older tuning table.
+
+Stage 9b first recreates the chosen model's predictions over all validation folds and writes
+pooled, fold-specific, monthly, seasonal-part and sensor-location diagnostics. It then records the
+chosen parameters and reason before fitting the model through 31 March 2024 and assessing it on
+1 October-31 December 2024. The recent pre-LEZ period therefore remains outside candidate
+selection. Because results for this period were inspected during the earlier automatic-selection
+workflow, it is described as a recent holdout robustness check rather than a completely untouched
+final test. No further model changes should be made in response to this period's result. After the
+check, `scripts/10_train_random_forest.py` fits the final model using all accepted pre-LEZ
+heating-month observations, including October-December 2024.
 
 The Random Forest is also compared with a simple benchmark which predicts each sensor-location
 pair's mean PM₂.₅ from the corresponding training block. If a pair has no accepted training value
@@ -351,10 +363,20 @@ Mean absolute error (MAE) is the primary validation measure. Root mean squared e
 shows sensitivity to large errors, and the coefficient of determination (R²) describes the
 explained variation. Mean error, calculated as prediction minus observation, reports systematic
 over- or under-prediction. Metrics are written for every fold, for all out-of-block predictions
-combined, and separately for October–December and January–March. A second table reports the same
+combined, and separately for October-December and January-March. A second table reports the same
 measures for each sensor-location pair so that poor performance at individual locations is not
-hidden by the overall result. The autumn 2024 test metrics and predictions are stored separately
-from the validation outputs.
+hidden by the overall result. Monthly metrics show whether errors are concentrated in particular
+parts of a winter. A predictor-shift table compares the mean and standard deviation of each input
+between every training block and its later evaluation block. The autumn 2024 holdout metrics and
+predictions are stored separately from the validation outputs.
+
+If time permits, `scripts/09c_validate_gradient_boosting.py` evaluates an optional histogram-based
+Gradient Boosting regressor with the same response, predictors and blocked folds. Gradient
+Boosting is a separate tree-ensemble method, not a type of Random Forest: trees are added
+sequentially to correct earlier errors rather than being fitted independently and averaged. Its
+internal random early-stopping split is disabled so that only the declared temporal folds govern
+validation. This stage creates a comparison table only and does not automatically replace the
+Random Forest selected for the main analysis.
 
 No calendar-year trend is supplied to the Random Forest. The counterfactual therefore assumes
 that the pre-LEZ relationship between PM₂.₅, weather, season and location remains sufficiently
@@ -403,7 +425,9 @@ output.
 | Retrieve ERA5 | `scripts/06_download_era5.py` | `meteorology.py` | Monthly NetCDF chunks and `download_ledger.jsonl` |
 | Prepare predictors | `scripts/07_prepare_predictors.py` | `meteorology.py` | `data/interim/predictors/daily_predictors.csv` |
 | Build model table | `scripts/08_build_model_table.py` | `modeling.py` | `data/processed/model_table.csv` |
-| Tune, validate and test Random Forest | `scripts/09_validate_random_forest.py` | `modeling.py` | Validation, recent-test and tuning outputs |
+| Compare Random Forest candidates | `scripts/09_validate_random_forest.py` | `modeling.py` | Complete RF candidate table from blocked folds |
+| Select Random Forest and run diagnostics | `scripts/09b_select_random_forest.py` | `modeling.py` | Recorded selection, validation diagnostics and recent-holdout outputs |
+| Compare Gradient Boosting (optional) | `scripts/09c_validate_gradient_boosting.py` | `modeling.py` | Gradient Boosting candidate table from the same folds |
 | Train final Random Forest | `scripts/10_train_random_forest.py` | `modeling.py` | `models/random_forest.joblib` and model metadata |
 | Predict no-LEZ baseline | `scripts/11_predict_counterfactual.py` | `modeling.py` | `data/processed/counterfactual_predictions.csv` |
 | Summarise results | `scripts/12_summarise_results.py` | `modeling.py` | Period, date and sensor-location summary tables |
@@ -413,7 +437,8 @@ All entry points read `configs/pipeline.yaml`, which points to the model specifi
 `sample_data/` contains synthetic data for `tests/test_pipeline.py`, while
 `tests/test_modeling.py` generates a small multi-season panel during the test. The offline tests
 cover spatial filtering, archive URL patterns, manifest construction, source combination,
-completeness, daily aggregation and all five model stages without contacting external services.
+completeness, daily aggregation and the complete model workflow without contacting external
+services.
 
 ## 7. References
 

@@ -3,14 +3,17 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 
 from sofia_lez.modeling import (
     _sensor_mean_prediction,
     build_model_table,
     predict_counterfactual,
+    select_random_forest,
     summarise_counterfactual,
     train_random_forest,
+    validate_gradient_boosting,
     validate_random_forest,
 )
 
@@ -55,14 +58,27 @@ def _model_config(path: Path) -> None:
             "random_state": 42,
             "final_n_jobs": 1,
             "search": {
-                "n_iter": 1,
                 "n_jobs": 1,
                 "verbose": 0,
-                "parameter_distributions": {
+                "parameter_grid": {
                     "model__n_estimators": [5],
                     "model__max_depth": [5],
                     "model__max_features": [1.0],
                     "model__min_samples_leaf": [1],
+                },
+            },
+        },
+        "gradient_boosting": {
+            "random_state": 42,
+            "search": {
+                "n_jobs": 1,
+                "verbose": 0,
+                "parameter_grid": {
+                    "model__learning_rate": [0.1],
+                    "model__max_iter": [5],
+                    "model__max_leaf_nodes": [5],
+                    "model__min_samples_leaf": [5],
+                    "model__l2_regularization": [0.0],
                 },
             },
         },
@@ -187,8 +203,12 @@ def _pipeline_config(tmp_path: Path) -> dict:
             "validation_metrics": tmp_path / "validation_metrics.csv",
             "validation_metrics_by_sensor": tmp_path / "validation_metrics_by_sensor.csv",
             "validation_metrics_by_season_part": tmp_path / "validation_by_season_part.csv",
+            "validation_metrics_by_month": tmp_path / "validation_by_month.csv",
             "test_metrics": tmp_path / "test_metrics.csv",
             "test_metrics_by_sensor": tmp_path / "test_metrics_by_sensor.csv",
+            "test_metrics_by_month": tmp_path / "test_metrics_by_month.csv",
+            "predictor_shift": tmp_path / "predictor_shift.csv",
+            "gradient_boosting_tuning_results": tmp_path / "gb_tuning_results.csv",
             "model_file": tmp_path / "random_forest.joblib",
             "model_metadata": tmp_path / "random_forest_metadata.json",
             "feature_importance": tmp_path / "feature_importance.csv",
@@ -221,7 +241,28 @@ def test_random_forest_workflow_uses_blocked_pre_lez_data(tmp_path, monkeypatch)
     validation = validate_random_forest(config)
     assert validation["validation_folds"] == 2
     assert validation["parameter_sets_tested"] == 1
-    assert validation["test_period"] == "autumn_2021"
+    assert validation["selection_required"]
+    assert benchmark_windows == []
+    assert not config["paths"]["selected_parameters"].exists()
+    tuning = pd.read_csv(config["paths"]["tuning_results"])
+    assert tuning.loc[0, "candidate_rank"] == 1
+    assert tuning.loc[0, "within_one_standard_error"]
+    assert np.isclose(
+        tuning.loc[0, "training_validation_gap"],
+        tuning.loc[0, "mean_validation_mae"] - tuning.loc[0, "mean_training_mae"],
+    )
+    with pytest.raises(ValueError, match="selection reason is required"):
+        select_random_forest(config, candidate_rank=1, selection_reason="  ")
+    with pytest.raises(ValueError, match="Candidate rank 2 is unavailable"):
+        select_random_forest(config, candidate_rank=2, selection_reason="Invalid rank check")
+
+    selection = select_random_forest(
+        config,
+        candidate_rank=1,
+        selection_reason="Synthetic-test selection",
+    )
+    assert selection["candidate_rank"] == 1
+    assert selection["test_period"] == "autumn_2021"
     assert benchmark_windows == [
         (pd.Timestamp("2019-03-31"), pd.Timestamp("2019-10-01")),
         (pd.Timestamp("2020-03-31"), pd.Timestamp("2020-10-01")),
@@ -236,12 +277,30 @@ def test_random_forest_workflow_uses_blocked_pre_lez_data(tmp_path, monkeypatch)
         config["paths"]["validation_metrics_by_season_part"]
     )
     assert set(season_part_metrics["season_part"]) == {"oct_dec", "jan_mar"}
+    month_metrics = pd.read_csv(config["paths"]["validation_metrics_by_month"])
+    assert set(month_metrics["model"]) == {"random_forest", "sensor_mean_benchmark"}
     test_metrics = pd.read_csv(config["paths"]["test_metrics"])
     assert set(test_metrics["model"]) == {"random_forest", "sensor_mean_benchmark"}
+    assert config["paths"]["test_metrics_by_month"].exists()
+    predictor_shift = pd.read_csv(config["paths"]["predictor_shift"])
+    assert set(predictor_shift["period_type"]) == {"validation", "recent_holdout"}
     with config["paths"]["selected_parameters"].open(encoding="utf-8") as handle:
         selected = json.load(handle)
     assert selected["test_period"]["name"] == "autumn_2021"
+    assert selected["candidate_rank"] == 1
+    assert selected["selection_reason"] == "Synthetic-test selection"
     assert all(fold["name"] != "autumn_2021" for fold in selected["folds"])
+
+    repeated_validation = validate_random_forest(config)
+    assert repeated_validation["search_id"] != selected["search_id"]
+    with pytest.raises(ValueError, match="does not belong to the current Stage 9 search"):
+        train_random_forest(config)
+    select_random_forest(config, candidate_rank=1, selection_reason="Repeated selection")
+
+    comparison = validate_gradient_boosting(config)
+    assert comparison["validation_folds"] == 2
+    assert comparison["parameter_sets_tested"] == 1
+    assert config["paths"]["gradient_boosting_tuning_results"].exists()
 
     trained = train_random_forest(config)
     assert trained["training_end"] == "2021-12-31"

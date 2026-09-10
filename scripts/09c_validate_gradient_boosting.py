@@ -1,9 +1,9 @@
-"""Stage 9a: compare Random Forest candidates on blocked pre-LEZ periods."""
+"""Optional Stage 9c: compare Gradient Boosting on the same temporal folds."""
 
 import argparse
 
 from sofia_lez.config import load_config
-from sofia_lez.modeling import validate_random_forest
+from sofia_lez.modeling import validate_gradient_boosting
 
 
 def main() -> None:
@@ -12,7 +12,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    summary = validate_random_forest(config)
+    summary = validate_gradient_boosting(config)
     print(f"Pre-LEZ training rows available: {summary['training_rows']}")
     print(f"Blocked validation folds: {summary['validation_folds']}")
     print(f"Parameter sets tested: {summary['parameter_sets_tested']}")
@@ -22,8 +22,7 @@ def main() -> None:
         f"{summary['one_standard_error_candidates']}"
     )
     print(f"Candidate diagnostics: {summary['tuning_results']}")
-    print("No candidate from this search has been selected.")
-    print("The recent holdout has not been evaluated; any earlier selection is now stale.")
+    print("This comparison does not select or replace the Random Forest.")
 
 
 if __name__ == "__main__":

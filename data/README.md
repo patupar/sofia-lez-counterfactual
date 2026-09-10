@@ -22,7 +22,11 @@ data/
 ```
 
 The model table keeps the complete stable-pair predictor panel. PM₂.₅ remains missing when a
-sensor-day is unavailable or fails daily QC; missing outcomes are not imputed. Generated files in
-`data/interim/` and `data/processed/` remain local and can be reproduced from the numbered scripts.
+sensor-day is unavailable or fails daily QC; missing outcomes are not imputed. Stage 9 writes the
+complete RF candidate table but no selected model. Stage 9b writes the audited selection, detailed
+validation and recent-holdout predictions, and only then permits final training. The optional
+Gradient Boosting table is kept separately and does not replace the RF automatically. Generated
+files in `data/interim/` and `data/processed/` remain local and can be reproduced from the numbered
+scripts.
 
 Only the synthetic files under `sample_data/` are committed.

@@ -15,8 +15,10 @@ from .meteorology import download_era5, prepare_predictors
 from .modeling import (
     build_model_table,
     predict_counterfactual,
+    select_random_forest,
     summarise_counterfactual,
     train_random_forest,
+    validate_gradient_boosting,
     validate_random_forest,
 )
 from .sensors import build_unified_hourly
@@ -100,6 +102,10 @@ def _validate_model(config: dict) -> dict:
     return validate_random_forest(config)
 
 
+def _validate_gradient_boosting(config: dict) -> dict:
+    return validate_gradient_boosting(config)
+
+
 def _train_model(config: dict) -> dict:
     return train_random_forest(config)
 
@@ -128,6 +134,7 @@ COMMANDS: dict[str, Callable[[dict], dict]] = {
     "prepare-predictors": _predictors,
     "build-model-table": _model_table,
     "validate-random-forest": _validate_model,
+    "validate-gradient-boosting": _validate_gradient_boosting,
     "train-random-forest": _train_model,
     "predict-counterfactual": _predict_counterfactual,
     "summarise-results": _summarise_results,
@@ -146,9 +153,6 @@ DATA_COMMANDS = [
 MODEL_COMMANDS = [
     "build-model-table",
     "validate-random-forest",
-    "train-random-forest",
-    "predict-counterfactual",
-    "summarise-results",
 ]
 
 
@@ -172,12 +176,23 @@ def build_parser() -> argparse.ArgumentParser:
                 "download-era5": "download hourly ERA5 data for the stable-panel area",
                 "prepare-predictors": "prepare daily meteorological and temporal predictors",
                 "build-model-table": "join daily PM2.5 and predictors for the stable panel",
-                "validate-random-forest": "tune and assess the model in blocked time periods",
+                "validate-random-forest": "compare RF candidates in blocked time periods",
+                "validate-gradient-boosting": "optionally compare Gradient Boosting candidates",
                 "train-random-forest": "fit the selected model to all pre-LEZ training rows",
                 "predict-counterfactual": "predict the no-LEZ post-intervention baseline",
                 "summarise-results": "summarise observed and counterfactual PM2.5",
             }[command],
         )
+    selection = subparsers.add_parser(
+        "select-random-forest",
+        help="record one RF candidate and evaluate it on the recent holdout",
+    )
+    selection.add_argument("--candidate-rank", type=int, required=True)
+    selection.add_argument(
+        "--reason",
+        required=True,
+        help="short audit note explaining the validation-based choice",
+    )
     run = subparsers.add_parser("run", help="run the configured workflow sequence")
     run.add_argument(
         "--skip-download",
@@ -197,7 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--include-modeling",
         action="store_true",
-        help="run model-table construction, validation, training and prediction after Stage 7",
+        help="build the model table and compare RF candidates after Stage 7",
     )
     return parser
 
@@ -206,6 +221,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     config = load_config(args.config)
+    if args.command == "select-random-forest":
+        summary = select_random_forest(
+            config,
+            candidate_rank=args.candidate_rank,
+            selection_reason=args.reason,
+        )
+        print(json.dumps(summary, indent=2))
+        return 0
     if args.command in COMMANDS:
         print(json.dumps(COMMANDS[args.command](config), indent=2))
         return 0

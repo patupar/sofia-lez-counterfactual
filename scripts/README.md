@@ -13,7 +13,9 @@ meteorological data. Stages 8–12 construct, validate and apply the counterfact
 | 6 | `06_download_era5.py` | implemented |
 | 7 | `07_prepare_predictors.py` | implemented |
 | 8 | `08_build_model_table.py` | implemented |
-| 9 | `09_validate_random_forest.py` | implemented: tune, validate and run recent holdout test |
+| 9a | `09_validate_random_forest.py` | implemented: compare the complete RF grid on blocked folds |
+| 9b | `09b_select_random_forest.py` | implemented: record one RF candidate, create diagnostics and run the recent holdout |
+| 9c | `09c_validate_gradient_boosting.py` | optional: compare Gradient Boosting on the same blocked folds |
 | 10 | `10_train_random_forest.py` | implemented |
 | 11 | `11_predict_counterfactual.py` | implemented |
 | 12 | `12_summarise_results.py` | implemented |
@@ -27,6 +29,20 @@ python scripts/01_build_sensor_manifest.py --config configs/pipeline.yaml
 Model settings, predictors, validation blocks and the hyperparameter search are declared in
 `configs/model.yaml`. Generated model files, validation outputs and counterfactual results are
 excluded from Git.
+
+Stage 9a does not choose a model. Inspect its candidate table and record the selected RF before
+training:
+
+```bash
+python scripts/09b_select_random_forest.py \
+  --config configs/pipeline.yaml \
+  --candidate-rank <rank> \
+  --reason "<brief validation-based reason>"
+```
+
+The selection step recreates detailed validation predictions, compares the RF with the
+training-only sensor-mean benchmark, reports monthly and sensor-level errors, checks predictor
+shift and only then evaluates the selected candidate on the autumn 2024 holdout.
 
 `06_download_era5.py` requires external CDS credentials. The script accepts both a direct NetCDF
 response and the split instantaneous/accumulated ZIP response currently returned for the selected

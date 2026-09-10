@@ -74,12 +74,27 @@ python scripts/06_download_era5.py --config configs/pipeline.yaml
 python scripts/07_prepare_predictors.py --config configs/pipeline.yaml
 python scripts/08_build_model_table.py --config configs/pipeline.yaml
 python scripts/09_validate_random_forest.py --config configs/pipeline.yaml
+python scripts/09b_select_random_forest.py \
+  --config configs/pipeline.yaml \
+  --candidate-rank <rank> \
+  --reason "<brief validation-based reason>"
 python scripts/10_train_random_forest.py --config configs/pipeline.yaml
 python scripts/11_predict_counterfactual.py --config configs/pipeline.yaml
 python scripts/12_summarise_results.py --config configs/pipeline.yaml
 ```
 
-Or run the complete sequence:
+Stage 9 evaluates the complete configured Random Forest grid but does not select a model. Inspect
+`data/interim/model/rf_tuning_results.csv`, then pass the chosen `candidate_rank` to Stage 9b.
+Selection must use the blocked validation diagnostics rather than the autumn 2024 result. Stage 9b
+records the decision and then evaluates the frozen candidate on that recent holdout.
+
+If time permits, compare Gradient Boosting on exactly the same folds before selecting the RF:
+
+```bash
+python scripts/09c_validate_gradient_boosting.py --config configs/pipeline.yaml
+```
+
+Or run the workflow through RF candidate validation:
 
 ```bash
 sofia-lez --config configs/pipeline.yaml run --include-provisional-panel --include-modeling
@@ -87,6 +102,8 @@ sofia-lez --config configs/pipeline.yaml run --include-provisional-panel --inclu
 
 Use `--skip-download` when the Sensor.Community archive is already cached and
 `--skip-era5-download` when the ERA5 NetCDF chunks are already cached.
+Because model selection requires an audited decision, `--include-modeling` stops after Stage 9.
+Stages 9b–12 are then run explicitly.
 
 ## Workflow
 
@@ -101,14 +118,16 @@ Use `--skip-download` when the Sensor.Community archive is already cached and
 | ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible monthly hourly ERA5 NetCDF chunks for the stable-panel extent |
 | Predictor preparation | `data/interim/predictors/daily_predictors.csv` | Match ERA5 grid cells to stable pairs and aggregate weather to Sofia local days |
 | Model-table construction | `data/processed/model_table.csv` | Join the complete predictor panel to available QC-valid daily PM₂.₅ observations |
-| Model validation and test | validation metrics, test metrics and tuning results | Tune with three complete blocked heating seasons, then test once on autumn 2024 |
+| RF candidate validation | `data/interim/model/rf_tuning_results.csv` | Compare all configured RF candidates on three complete blocked heating seasons |
+| Optional Gradient Boosting comparison | `data/interim/model/gradient_boosting_tuning_results.csv` | Compare a second tree-ensemble method on the same folds without replacing the RF |
+| RF selection and recent holdout | selected parameters, validation diagnostics and test metrics | Record an audited RF choice, recreate its fold predictions and then assess autumn 2024 |
 | Final model | `models/random_forest.joblib` | Fit the selected Random Forest to all accepted 2018–2024 heating-month observations |
 | Counterfactual prediction | `data/processed/counterfactual_predictions.csv` | Predict the two post-LEZ periods using observed weather and temporal conditions |
 | Result summary | tables under `outputs/tables/` | Compare observed and predicted PM₂.₅ by period, date and sensor-location pair |
 
-`configs/model.yaml` records the response, predictor list, blocked validation dates, recent test
-period, random seed and hyperparameter search. The post-LEZ response is never used for model
-selection or fitting.
+`configs/model.yaml` records the response, predictor list, blocked validation dates, recent
+holdout, random seeds and hyperparameter grids. The selected RF candidate and reason are written
+to a separate JSON record. The post-LEZ response is never used for model selection or fitting.
 
 ## Documentation
 The repository contains two complementary records:
