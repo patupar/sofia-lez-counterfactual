@@ -485,6 +485,20 @@ a recent robustness check and should not be used to change the selected model. A
 (whether it will be used, compared with the RF and discussed in the report will be determined by remaining time left for the project). 
 It represents a separate tree-based ensemble approach and uses the same predictors and blocked validation folds. 
 
+**Output `scripts/09_validate_random_forest.py`** [run 2: 10.09.2026]
+
+```text
+Pre-LEZ training rows available: 71152
+Blocked validation folds: 3
+Parameter sets tested: 54
+Lowest cross-validation MAE: 7.972 ug/m3
+Candidates within one standard error: 30
+Candidate diagnostics: /Users/ptupar/sofia-lez-counterfactual/data/interim/model/rf_tuning_results.csv
+No candidate from this search has been selected.
+The recent holdout has not been evaluated; any earlier selection is now stale.
+```
+
+
 
 
 
