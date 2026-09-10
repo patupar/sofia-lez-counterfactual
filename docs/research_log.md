@@ -461,7 +461,7 @@ difference between training and validation error.
 | ---------------------------------- | -------------------: | ---------------------: | ----------------------------------: |
 | Random Forest, depth 10            |                 5.22 |                   8.11 |                                2.89 |
 | Random Forest, depth 5             |         Not reported |                   8.18 |               Smaller than depth 10 |
-| Difference between validation MAEs |                    — |                   0.07 |                                   — |
+| Difference between validation MAEs |                    — |                 ≈ 0.08 |                                   — |
 
 The difference of 0.07 µg/m³ between both validation results is small compared with the variation across folds. Selecting the 
 model only according to its numerical rank could therefore favour a more strongly overfitted configuration.
