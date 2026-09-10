@@ -424,3 +424,68 @@ pre-LEZ observations.
 A sensor-specific historical mean will provide a simple benchmark. After validation and testing, the final
 model will be fitted to all accepted pre-LEZ heating-month observations, including autumn 2024. Post-LEZ PM₂.₅ 
 observations will not be used for tuning or fitting and remain reserved for comparison against the no-LEZ predictions.
+
+### 5.1 Model table 
+
+**Output `scripts/08_build_model_table.py`** [09.09.2026]
+
+The resulting model table contains 231,924 rows, corresponding to 77 stable sensor-location pairs across 3,012 days. 
+PM₂.₅ observations passed quality control for 182,328 rows, or 78.6% of the complete predictor panel. The 
+remaining 21.4% reflect missing or rejected sensor observations, while the corresponding meteorological records are retained.
+
+Restricting the data to QC-valid observations during the pre-LEZ heating months from 2018 to 2024 leaves 71,152 observations 
+for model training. This corresponds to 72.4% of the 98,252 theoretically possible sensor-days within the training period.
+
+**Output `scripts/09_validate_random_forest.py`** [run 1: 09.09.2026]
+The Random Forest was tuned using 16 parameter combinations across three blocked validation folds, resulting in 48 model fits. 
+The selected configuration used 200 trees, a maximum tree depth of 10, one minimum observation per leaf and the square root of 
+the available features at each split.
+Across the combined validation folds, the Random Forest achieved an MAE of 8.10 µg/m³, compared with 9.23 µg/m³ for the historical
+sensor-mean benchmark. This corresponds to an improvement of approximately 12.3%. The Random Forest achieved a lower MAE in each 
+validation fold, with no consistent deterioration across the three periods.
+However, both approaches produced negative R² values and systematically overpredicted PM₂.₅. The Random Forest had a mean error 
+of +6.00 µg/m³ across validation. During the separate October–December 2024 test period, it performed worse than the benchmark: 
+its MAE was 7.80 µg/m³, compared with 7.39 µg/m³ for the benchmark. Its mean error also increased to +6.47 µg/m³.
+The validation therefore shows that the Random Forest improves average performance across the earlier folds but does not generalise 
+reliably to the most recent pre-intervention period. Final model training is postponed until the temporal bias and the difference 
+between validation and test performance have been examined.
+
+**Changes in modelling approach** [10.09.2026]
+
+The first model run automatically selected the parameter combination with the lowest mean validation MAE. However, the selected 
+depth-10 Random Forest had a training MAE of 5.22 µg/m³ and a validation MAE of 8.11 µg/m³, resulting in a difference of 2.89 µg/m³. 
+A simpler depth-5 model achieved an only slightly higher validation MAE of 8.18 µg/m³, while showing a considerably smaller 
+difference between training and validation error.
+
+| Model                              | Training MAE (µg/m³) | Validation MAE (µg/m³) | Train–validation difference (µg/m³) |
+| ---------------------------------- | -------------------: | ---------------------: | ----------------------------------: |
+| Random Forest, depth 10            |                 5.22 |                   8.11 |                                2.89 |
+| Random Forest, depth 5             |         Not reported |                   8.18 |               Smaller than depth 10 |
+| Difference between validation MAEs |                    — |                   0.07 |                                   — |
+
+The difference of 0.07 µg/m³ between both validation results is small compared with the variation across folds. Selecting the 
+model only according to its numerical rank could therefore favour a more strongly overfitted configuration.
+
+The modelling workflow was adjusted so that Stage 9 no longer selects a model automatically. Instead, all 54 configured Random 
+Forest parameter combinations are evaluated across the three blocked validation folds, resulting in 162 model fits. For each 
+candidate, the output records training and validation MAE, validation RMSE and R², variation between folds, fitting time and 
+the difference between training and validation error. Candidates whose validation MAE falls within one standard error of the 
+lowest result are also identified. This allows model performance and model complexity to be considered together.
+
+After inspecting these results, one candidate must be selected explicitly in Stage 9b by providing its rank and a brief reason 
+for the decision (acting as a selection gate). The selection is linked to the corresponding Stage 9 run, preventing an older 
+selection from being used if the parameter search is repeated. The selected candidate is then compared with the historical 
+sensor-mean benchmark and evaluated by validation fold, month, heating-season part and sensor-location pair. Predictor 
+distributions are also compared between training and evaluation periods to identify possible temporal shifts in the meteorological 
+conditions.
+
+Only after the candidate has been recorded is it evaluated on the October–December 2024 holdout period. As this period was already 
+inspected during the first model run, it can no longer be treated as a completely untouched final test. It will instead be used as 
+a recent robustness check and should not be used to change the selected model. An optional Gradient Boosting comparison is also added 
+(whether it will be used, compared with the RF and discussed in the report will be determined by remaining time left for the project). 
+It represents a separate tree-based ensemble approach and uses the same predictors and blocked validation folds. 
+
+
+
+
+
