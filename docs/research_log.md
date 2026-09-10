@@ -519,6 +519,24 @@ The recent October–December 2024 holdout was not evaluated during this run.
 | Validation R²              |       −0.27 |        −0.10 |
 | Fold-to-fold MAE variation |        0.56 |         0.46 |
 
+Candidate 14, run 2 shows an improvement over the strongest scoring depth-10 and depth-5 models from run across every metric. Nevertheless R² < 0 implies the current RF model underperforms a naive mean baseline. 
+This work was initially was conceived as meteorological normalised counterfactual assessment of PM₂.₅. Train the relationship between PM₂.₅ and meteorology in the pre LEZ-intervention period to predict the concentrations for the relevant heating period post LEZ-intervention. However, using solely meteorological (at least the relatively easily accessible ERA5 dataset) and the QC-filtered 77 stations for training has lead to an unexpected issue. ERA5 data is at this scale coarse. The 77 sensor-location pairs are assigned to only five unique ERA 5 grid cells. 
+
+| ERA5 latitude | ERA5 longitude | Sensors assigned |
+| ------------: | -------------: | ---------------: |
+|         42.75 |          23.25 |               59 |
+|         42.75 |          23.50 |               11 |
+|         42.50 |          23.25 |                4 |
+|         42.50 |          23.50 |                2 |
+|         42.75 |          23.00 |                1 |
+|     **Total** |                |           **77** |
+
+Over 70% of which are assigned to only one of them, leaving the model little to differentiate on and could in part plausibly explain the low scoring validation R². This considered, the decision was made to include to further predictor datasets. 
+
+As such, a local climate zone dataset (LCZ) data will consequently be introduced as an additional spatial predictor. LCZ classes describe differences in urban form and land cover that can influence ventilation, pollutant dispersion and the spatial distribution of PM₂.₅. Existing literature supports evaluating LCZ variables for explaining urban PM₂.₅ patterns (https://doi.org/10.1016/j.scitotenv.2023.161677; https://doi.org/10.1016/j.scs.2026.107314)
+
+Integrating a dataset for households using solid fuels for heating in Sofia was considered. However the data stems from Bulgaria's 2011 census and was therefore considered not recent enough. Future related work could employ this dataset if more recent record is published. This dataset will however not be used for the project at this stage.  
+
 
 
 
