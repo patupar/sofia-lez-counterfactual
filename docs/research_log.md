@@ -498,6 +498,28 @@ No candidate from this search has been selected.
 The recent holdout has not been evaluated; any earlier selection is now stale.
 ```
 
+The second Random Forest validation run evaluated 54 parameter combinations across three temporally blocked validation folds, 
+resulting in 162 model fits. The lowest mean validation MAE was 7.97 µg/m³, and 30 candidates fell within one standard error of this result.
+
+The numerically highest-ranked model used unrestricted tree depth. Although it achieved the lowest validation MAE, its training MAE was 1.59 µg/m³ 
+compared with 7.97 µg/m³ during validation. The resulting difference of 6.38 µg/m³ indicates substantial overfitting.
+
+Candidate 14 provided a more balanced result. It used 200 trees, a maximum depth of 5, the square root of the available predictors at each split 
+and at least five observations per leaf. Its training MAE was 7.66 µg/m³ and its validation MAE was 8.18 µg/m³, producing a difference 
+of 0.52 µg/m³. It also achieved a lower validation RMSE and a less negative R² than the highest-ranked candidate. Candidate 14 is therefore 
+preferred because it gives up little average accuracy while showing greater stability and considerably less overfitting. 
+The recent October–December 2024 holdout was not evaluated during this run.
+
+| Measure                    | Candidate 1 | Candidate 14 |
+| -------------------------- | ----------: | -----------: |
+| Validation MAE             |        7.97 |         8.18 |
+| Training MAE               |        1.59 |         7.66 |
+| Training–validation gap    |        6.38 |         0.52 |
+| Validation RMSE            |       11.63 |        10.74 |
+| Validation R²              |       −0.27 |        −0.10 |
+| Fold-to-fold MAE variation |        0.56 |         0.46 |
+
+
 
 
 
