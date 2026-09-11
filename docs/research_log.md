@@ -555,6 +555,23 @@ Therefore, classes are combined into five fixed groups:
 - Stage 8 joins the five static LCZ fractions to the daily model table using sensor and location IDs. The values are repeated across the daily observations belonging to the same sensor-location pair.
 - The Random Forest now uses 18 predictors: the previous 13 predictors and the five grouped LCZ fractions. As the predictor set has changed, the previous parameter search and candidate selection are considered stale. The Random Forest validation will be repeated using the same blocked temporal folds, allowing the LCZ-enhanced results to be compared directly with the previous model.
 
+**Output `scripts/08_build_model_table.py` [run 3: 11.09.2026]**
+
+The model table was rebuilt, adjusted for the five grouped LCZ predictors. Accordingly, it now contains 18 predictors in total: 13 meteorological, temporal and coordinate predictors, alongside the new five LCZ fractions.
+
+| Output | Result |
+|---|---:|
+| Model-table rows | 231,924 |
+| Stable sensor-location pairs | 77 |
+| Grouped LCZ predictors | 5 |
+| QC-valid PM$_{2.5}$ rows | 182,328 |
+| Eligible pre-LEZ training rows | 71,152 |
+| Post-LEZ prediction rows | 20,944 |
+
+The number of rows, sensor-location pairs and eligible training observations remained unchanged from the previous model table. This confirms that LCZ was added as static spatial information without removing or duplicating observations.
+
+No sensor-date duplicates or missing predictor values were found in either the training or post-intervention periods. The LCZ values remain constant through time for each sensor-location pair, while the five fractions sum to one for every observation. Ergo, model table is considered complete and suitable for repeating the Random Forest validation.
+
 
 
 
