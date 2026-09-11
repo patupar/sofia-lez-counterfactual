@@ -403,7 +403,7 @@ October–March heating period, leaving dates between April and September unassi
 are observed among the meteorological predictors. The dataset can therefore be taken forward for construction 
 of the model table.
 
-### 4.2 Random Forest workflow design [09.09.2026]
+## 5. Random Forest workflow design 
 
 Model training and validation only use QC-valid observations from the pre-LEZ heating
 months. Validation will use later blocked heating periods rather than a random split of individual
@@ -536,6 +536,24 @@ Over 70% of which are assigned to only one of them, leaving the model little to 
 As such, a local climate zone dataset (LCZ) data will consequently be introduced as an additional spatial predictor. LCZ classes describe differences in urban form and land cover that can influence ventilation, pollutant dispersion and the spatial distribution of PM₂.₅. Existing literature supports evaluating LCZ variables for explaining urban PM₂.₅ patterns (https://doi.org/10.1016/j.scitotenv.2023.161677; https://doi.org/10.1016/j.scs.2026.107314)
 
 Integrating a dataset for households using solid fuels for heating in Sofia was considered. However the data stems from Bulgaria's 2011 census and was therefore considered not recent enough. Future related work could employ this dataset if more recent record is published. This dataset will however not be used for the project at this stage.  
+
+### 5.2 Updated Random Forest workflow design with LCZ
+To accommodate for LCZ, the Random Forest workflow design is adjusted in the following manner:
+- New Stage 7b calculates LCZ composition within a 500 m circular buffer around each of the 77 stable sensor-location pairs. A buffer is applied instead of the single corresponding raster pixel at sensor-location, to records the surrounding neighbourhood and reduce sensitivity to individual pixel assignments. 
+- The original 17 LCZ class fractions are retained in the intermediate output for inspection. However, using all 17 classes as separate model predictors is considered excessive given that LCZ varies across only 77 sensor locations. Several individual classes are also only sparsely represented in the spatial unit.
+
+Therefore, classes are combined into five fixed groups:
+  
+| Model predictor | LCZ classes | Included LCZ types |
+|---|---:|---|
+| Compact built | 1–3 | Compact high-rise, compact mid-rise, compact low-rise |
+| Open built | 4–6 | Open high-rise, open mid-rise, open low-rise |
+| Other built | 7–10 | Lightweight low-rise, large low-rise, sparsely built, heavy industry |
+| Vegetation | 11–14 | Dense trees, scattered trees, bush or scrub, low plants |
+| Bare surfaces and water | 15–17 | Bare rock or paved surfaces, bare soil or sand, water |
+
+- Stage 8 joins the five static LCZ fractions to the daily model table using sensor and location IDs. The values are repeated across the daily observations belonging to the same sensor-location pair.
+- The Random Forest now uses 18 predictors: the previous 13 predictors and the five grouped LCZ fractions. As the predictor set has changed, the previous parameter search and candidate selection are considered stale. The Random Forest validation will be repeated using the same blocked temporal folds, allowing the LCZ-enhanced results to be compared directly with the previous model.
 
 
 
