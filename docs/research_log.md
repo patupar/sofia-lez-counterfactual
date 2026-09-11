@@ -572,6 +572,56 @@ The number of rows, sensor-location pairs and eligible training observations rem
 
 No sensor-date duplicates or missing predictor values were found in either the training or post-intervention periods. The LCZ values remain constant through time for each sensor-location pair, while the five fractions sum to one for every observation. Ergo, model table is considered complete and suitable for repeating the Random Forest validation.
 
+**Output `scripts/09_validate_random_forest.py` [run 3: 11.09.2026]**
+
+With the new model table applied, RF search evaluated 54 parameter combinations across three blocked validation folds, resulting in 162 model fits. The models used 71,152 pre-LEZ observations and the updated set of 18 predictors.
+
+The lowest mean validation MAE attained = 8.121 µg/m³. However, 30 candidates fell within one standard error of this result, indicating that many parameter combinations performed similarly.
+
+| Metric                                 | Rank 1 | Candidate 7 |
+| -------------------------------------- | -----: | ----------: |
+| Number of trees                        |    100 |         200 |
+| Maximum depth                          |      5 |           5 |
+| Maximum features                       |    0.5 |      `sqrt` |
+| Minimum observations per leaf          |      3 |           5 |
+| Training MAE (µg/m³)                   |  7.376 |       7.643 |
+| Validation MAE (µg/m³)                 |  8.121 |       8.133 |
+| Validation RMSE (µg/m³)                | 11.558 |      10.467 |
+| Mean validation R²                     | −0.261 |      −0.053 |
+| Fold-to-fold MAE variation             |  0.632 |       0.470 |
+| Training–validation difference (µg/m³) |  0.745 |       0.491 |
+
+Candidate 1 attained the lowest validation MAE, but performed only marginally better (0.012 µg/m³) over candidate 7. Candidate 7 produced a considerably lower RMSE, a less negative R², lower variation between folds and a smaller difference between training and validation error. It is therefore identified as a more balanced and suggests less evidence of overfitting. 
+
+Candidate 7 also uses the same RF parameters as the preferred (candidate 14) depth-5 model from run 2. When brought into comparison, it is possible to asses the impact as a result from introducing LCZ.  
+
+| Metric | Run 2 without LCZ: candidate 14 | Run 3 with LCZ: candidate 7 | Change |
+|---|---:|---:|---:|
+| Validation MAE (µg/m³) | 8.183 | 8.133 | −0.050 |
+| Validation RMSE (µg/m³) | 10.740 | 10.467 | −0.272 |
+| Mean validation R² | −0.105 | −0.053 | +0.052 |
+| Training–validation difference (µg/m³) | 0.521 | 0.491 | −0.030 |
+| Fold-to-fold MAE variation | 0.457 | 0.470 | +0.012 |
+
+Adding LCZ reduces validation MAE by 0.050 µg/m³ and the RMSE by 0.272 µg/m³. The mean validation R² moves closer to zero and the difference between training and validation error decreases slightly. This suggests that LCZ adds some useful spatial information and particularly helped reduce larger prediction errors. However, the attained improvements remain small and the variation between folds increases slightly
+
+A particularly unfortunate point to note stands in relation to the continued mean negative validation R² results. Further inspection showed that this result can be primarily attributed to the first validation fold. 
+
+| Validation fold                    | Heating period | Validation MAE (µg/m³) | Validation RMSE (µg/m³) | Validation R² | Interpretation                                                        |
+| ---------------------------------- | -------------- | ---------------------: | ----------------------: | ------------: | --------------------------------------------------------------------- |
+| Fold 1                             | 2021–2022      |                  8.365 |                  10.919 |        −0.329 | Performs considerably worse than the mean reference according to R²   |
+| Fold 2                             | 2022–2023      |                  8.557 |                  11.151 |         0.163 | Has the largest absolute errors, but explains some variation in PM₂.₅ |
+| Fold 3                             | 2023–2024      |                  7.478 |                   9.332 |         0.007 | Performs approximately as well as the mean reference                  |
+| Mean across all folds          | —              |              8.133 |              10.467 |    −0.053 | Negative mean R²                                                      |
+
+Fold 2 produced the highest MAE and RMSE, meaning that it had the largest absolute prediction errors. Fold 1 nevertheless performed worst relative to the variation present in its validation observations, as shown by its R² of −0.329. Since the R² values for folds 2 and 3 were both positive, the negative mean R² is entirely attributable to the result in fold 1. Without this fold, the mean R² would be 0.085. 
+
+This indicates that the model did not perform consistently across heating seasons, with the 2021–2022 validation period presenting the main limitation in relation to R². This result could be explained by the smaller training dataset available for the first fold and/or differences in conditions between winters. The model should therefore be described as showing limited and uneven temporal generalisation. 
+
+Including LCZ has broadly retained model performance and produced modest improvements in MAE, RMSE and R² in comparison to candidate 14, run 2. The intended improvement in predictive capacity is therefore partially met. The core issue to be improved--capacity in explaining variation in unseen periods, is observed, albeit not substantially. Therefore, taking everything into consideration, LCZ will be retained, with candidate 7 as the preferred configuration for the following stages. 
+
+Further experiments and alterations are not possible within the remaining project timeframe. Future iterations are advised to test meteorological data with increased spatial resolution, and explore using more direct emission-related predictors to determine whether these improve the model’s temporal and spatial differentiation. 
+
 
 
 
