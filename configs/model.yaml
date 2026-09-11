@@ -70,6 +70,8 @@ validation:
     test_end: "2024-12-31"
 
 predictors:
+  # Meteorological and temporal variables vary by day. Coordinates and the
+  # five grouped LCZ fractions provide local spatial context.
   - temperature_mean_c
   - relative_humidity_mean_pct
   - wind_speed_mean_ms
@@ -83,3 +85,8 @@ predictors:
   - weekday
   - lat
   - lon
+  - lcz_compact_built_fraction
+  - lcz_open_built_fraction
+  - lcz_other_built_fraction
+  - lcz_vegetation_fraction
+  - lcz_bare_water_fraction

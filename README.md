@@ -55,6 +55,15 @@ data/raw/filter/Sensor_Location.csv
 data/raw/filter/BGR/SC<location_id>_<sensor_id>.csv
 ```
 
+Place the supplied, already-clipped Global LCZ version 3 raster at:
+
+```text
+data/raw/lcz/lcz_sofia_clipped.tif
+```
+
+The full raster is treated as source data and is therefore not committed to Git. A small crop
+under `sample_data/lcz/` allows the LCZ preparation code to be tested without the full file.
+
 The 1,958 BGR files represent location-sensor pairs, not necessarily 1,958 physically
 distinct stations. One sensor may have operated at more than one location over time. `location_id`
 and `sensor_id` are there retained throughout the workflow.
@@ -72,6 +81,7 @@ python scripts/04_check_sensor_completeness.py --config configs/pipeline.yaml
 python scripts/05_select_stable_panel.py --config configs/pipeline.yaml
 python scripts/06_download_era5.py --config configs/pipeline.yaml
 python scripts/07_prepare_predictors.py --config configs/pipeline.yaml
+python scripts/07b_prepare_lcz.py --config configs/pipeline.yaml
 python scripts/08_build_model_table.py --config configs/pipeline.yaml
 python scripts/09_validate_random_forest.py --config configs/pipeline.yaml
 python scripts/09b_select_random_forest.py \
@@ -117,7 +127,8 @@ Stages 9b–12 are then run explicitly.
 | Stable-panel selection | `data/interim/diagnostics/stable_panel.csv` | Identify sensor-location pairs meeting the completeness requirement |
 | ERA5 retrieval | `data/raw/meteorology/era5/` and its download ledger | Cache reproducible monthly hourly ERA5 NetCDF chunks for the stable-panel extent |
 | Predictor preparation | `data/interim/predictors/daily_predictors.csv` | Match ERA5 grid cells to stable pairs and aggregate weather to Sofia local days |
-| Model-table construction | `data/processed/model_table.csv` | Join the complete predictor panel to available QC-valid daily PM₂.₅ observations |
+| LCZ preparation | `data/interim/predictors/lcz_sensor_features.csv` | Calculate five grouped LCZ fractions within 500 m of each stable sensor-location pair |
+| Model-table construction | `data/processed/model_table.csv` | Join daily predictors, static LCZ context and available QC-valid daily PM₂.₅ observations |
 | RF candidate validation | `data/interim/model/rf_tuning_results.csv` | Compare all configured RF candidates on three complete blocked heating seasons |
 | Optional Gradient Boosting comparison | `data/interim/model/gradient_boosting_tuning_results.csv` | Compare a second tree-ensemble method on the same folds without replacing the RF |
 | RF selection and recent holdout | selected parameters, validation diagnostics and test metrics | Record an audited RF choice, recreate its fold predictions and then assess autumn 2024 |
@@ -162,6 +173,7 @@ push and pull request.
 - [Sensor.Community archive](https://archive.sensor.community/) — daily SDS011 observations from
   2024 onwards
 - [ERA5 hourly data on single levels](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels) — hourly meteorological predictors
+- [Global Local Climate Zone map](https://doi.org/10.5281/zenodo.6364594) — filtered version 3 LCZ classes at approximately 100 m resolution, nominal year 2018
 - [SofiaPlan API](https://sofiaplan.bg/api/) — Sofia Municipality boundary
 - [AirBG](https://airbg.info/en/build-a-station/) — information about Sofia’s community-operated
   sensor network

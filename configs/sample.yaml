@@ -30,6 +30,8 @@ paths:
   background: "data/raw/background"
   policy: "data/raw/policy"
   predictors: "data/interim/predictors/sample_predictors.csv"
+  lcz_raster: "sample_data/lcz/lcz_sofia_sample.tif"
+  lcz_features: "data/interim/predictors/sample_lcz_sensor_features.csv"
   model_config: "configs/model.yaml"
   model_table: "data/processed/sample_model_table.csv"
   validation_predictions: "data/interim/model/sample_rf_validation_predictions.csv"
@@ -79,6 +81,15 @@ meteorology:
     - "surface_pressure"
     - "total_precipitation"
     - "boundary_layer_height"
+
+lcz:
+  buffer_radius_m: 500
+  class_groups:
+    lcz_compact_built_fraction: [1, 2, 3]
+    lcz_open_built_fraction: [4, 5, 6]
+    lcz_other_built_fraction: [7, 8, 9, 10]
+    lcz_vegetation_fraction: [11, 12, 13, 14]
+    lcz_bare_water_fraction: [15, 16, 17]
 
 qc:
   pm25_min: 0.0

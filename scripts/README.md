@@ -1,7 +1,7 @@
 # Workflow scripts
 
-The numbered scripts make the seminar workflow explicit. Stages 1–7 prepare the sensor and
-meteorological data. Stages 8–12 construct, validate and apply the counterfactual model.
+The numbered scripts make the seminar workflow explicit. Stages 1–7b prepare the sensor,
+meteorological and LCZ data. Stages 8–12 construct, validate and apply the counterfactual model.
 
 | Stage | Script | Status |
 |---|---|---|
@@ -12,6 +12,7 @@ meteorological data. Stages 8–12 construct, validate and apply the counterfact
 | 5 | `05_select_stable_panel.py` | implemented |
 | 6 | `06_download_era5.py` | implemented |
 | 7 | `07_prepare_predictors.py` | implemented |
+| 7b | `07b_prepare_lcz.py` | implemented: calculate five grouped LCZ buffer fractions |
 | 8 | `08_build_model_table.py` | implemented |
 | 9a | `09_validate_random_forest.py` | implemented: compare the complete RF grid on blocked folds |
 | 9b | `09b_select_random_forest.py` | implemented: record one RF candidate, create diagnostics and run the recent holdout |
@@ -29,6 +30,11 @@ python scripts/01_build_sensor_manifest.py --config configs/pipeline.yaml
 Model settings, predictors, validation blocks and the hyperparameter search are declared in
 `configs/model.yaml`. Generated model files, validation outputs and counterfactual results are
 excluded from Git.
+
+Stage 7b reads the already-clipped raster configured under `paths.lcz_raster`; it performs no
+download. It writes one static LCZ row per stable sensor-location pair. Stage 8 checks that these
+pairs and their coordinates match the daily predictor panel before joining the five grouped LCZ
+fractions used by the model.
 
 Stage 9a does not choose a model. Inspect its candidate table and record the selected RF before
 training:

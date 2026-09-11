@@ -35,6 +35,13 @@ total precipitation and boundary-layer height. Using the hourly source rather th
 daily product allows all variables to be aggregated to `Europe/Sofia` local dates, including
 23- and 25-hour days at daylight-saving transitions.
 
+#### 1.2.3 Local Climate Zones
+
+Local urban form is represented by the supplied filtered Global Local Climate Zone (LCZ)
+version 3 raster. The raster has a nominal spatial resolution of approximately 100 m, uses the
+17-class LCZ scheme and represents the nominal year 2018 (Demuzere et al., 2022). It has already
+been clipped around Sofia and is stored locally rather than downloaded by the workflow.
+
 
 ## 2. Preprocessing
 
@@ -116,6 +123,19 @@ meteorological records.
 The resulting table also contains cyclical day-of-year variables, weekday and a heating-season
 label. The heating-season label is retained for grouping and diagnostics; it is not part of the
 initial numeric Random Forest predictor list.
+
+#### Local Climate Zones
+
+`scripts/07b_prepare_lcz.py` reads the supplied raster and calculates LCZ composition from pixel
+centres inside a 500 m circular buffer around each stable sensor-location pair. This provides
+neighbourhood context rather than assigning only the LCZ value underneath the sensor. The 17
+original class fractions and dominant class are retained for checking, while the model uses five
+pre-defined fractions: compact built (classes 1–3), open built (4–6), other built (7–10),
+vegetation (11–14), and bare surfaces and water (15–17).
+
+Each class belongs to exactly one group. The code requires the grouped fractions to lie between
+zero and one and to sum to one for every sensor-location pair. LCZ values are static and are
+therefore calculated once for each pair rather than separately for every day.
 
 ### 2.2 Sensor quality control
 
@@ -251,6 +271,10 @@ latitude and longitude remain in the predictor table so the spatial assignment c
 ERA5 is not interpreted as neighbourhood-scale weather: its role is to control the broad daily
 meteorological variation affecting the fixed sensor locations.
 
+LCZ provides finer local spatial context around the same fixed locations. Stage 8 verifies that
+the LCZ table and meteorological predictor table contain the same sensor-location pairs and
+coordinates before the static LCZ fractions are repeated across the corresponding daily rows.
+
 ### 3.2 Temporal harmonisation
 
 Source timestamps are parsed as UTC and converted to `Europe/Sofia`. Hourly QC uses UTC hours to
@@ -272,12 +296,13 @@ information from the corresponding observation period.
 
 ### 4.1 Model table
 
-`scripts/08_build_model_table.py` joins the complete stable-panel predictor table to the daily
-sensor observations using `location_id`, `sensor_id` and local date. Daily PM₂.₅ is the response
-variable. The predictors are the eight meteorological variables, the sine and cosine of day of
-year, weekday, latitude and longitude listed in `configs/model.yaml`. Sensor and location
-identifiers are retained for grouping and checking but are not treated as continuous model
-inputs.
+`scripts/08_build_model_table.py` first joins the five static LCZ fractions to the daily
+meteorological predictor panel using `location_id` and `sensor_id`. It then joins the daily sensor
+observations using `location_id`, `sensor_id` and local date. Daily PM₂.₅ is the response
+variable. The predictors listed in `configs/model.yaml` are the eight meteorological variables,
+the sine and cosine of day of year, weekday, latitude, longitude and five grouped LCZ fractions.
+Sensor and location identifiers are retained for grouping and checking but are not treated as
+continuous model inputs.
 
 The join begins from the predictor table. Consequently, the model table retains one row for every
 stable sensor-location pair and date even where no valid PM₂.₅ observation is available. The
@@ -424,6 +449,7 @@ output.
 | Select stable panel | `scripts/05_select_stable_panel.py` | `completeness.py` | `data/interim/diagnostics/stable_panel.csv` |
 | Retrieve ERA5 | `scripts/06_download_era5.py` | `meteorology.py` | Monthly NetCDF chunks and `download_ledger.jsonl` |
 | Prepare predictors | `scripts/07_prepare_predictors.py` | `meteorology.py` | `data/interim/predictors/daily_predictors.csv` |
+| Prepare LCZ features | `scripts/07b_prepare_lcz.py` | `lcz.py` | `data/interim/predictors/lcz_sensor_features.csv` |
 | Build model table | `scripts/08_build_model_table.py` | `modeling.py` | `data/processed/model_table.csv` |
 | Compare Random Forest candidates | `scripts/09_validate_random_forest.py` | `modeling.py` | Complete RF candidate table from blocked folds |
 | Select Random Forest and run diagnostics | `scripts/09b_select_random_forest.py` | `modeling.py` | Recorded selection, validation diagnostics and recent-holdout outputs |
@@ -437,14 +463,19 @@ All entry points read `configs/pipeline.yaml`, which points to the model specifi
 `sample_data/` contains synthetic data for `tests/test_pipeline.py`, while
 `tests/test_modeling.py` generates a small multi-season panel during the test. The offline tests
 cover spatial filtering, archive URL patterns, manifest construction, source combination,
-completeness, daily aggregation and the complete model workflow without contacting external
-services.
+completeness, daily aggregation, LCZ grouping and the complete model workflow without contacting
+external services.
 
 ## 7. References
 
 Dhammapala, R., Huynh, T., & Singamsetti, V. (2022). Evaluation of twenty-three low-cost PM₂.₅
 sensors in the field: Can they be used for continuous monitoring? *Aerosol and Air Quality
 Research, 22*, 210266. https://doi.org/10.4209/aaqr.210266
+
+Demuzere, M., Kittner, J., Martilli, A., Mills, G., Moede, C., Stewart, I. D., van Vliet, J., &
+Bechtel, B. (2022). A global map of local climate zones to support earth system modelling and
+urban-scale environmental science. *Earth System Science Data, 14*, 3835–3873.
+https://doi.org/10.5194/essd-14-3835-2022
 
 Hassani, A., Castell, N., Schneider, P., Taherian, M., & Hassani, A. (2025). Harmonized,
 standardized and corrected crowd-sourced low-cost sensor PM₂.₅ data from Sensor.Community and

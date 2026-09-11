@@ -66,6 +66,51 @@ def _as_boolean(values: pd.Series) -> pd.Series:
     return values.fillna(False).astype(str).str.lower().eq("true")
 
 
+def _attach_lcz_features(config: dict, predictors: pd.DataFrame) -> pd.DataFrame:
+    """Join one static LCZ feature row to every daily row for the same sensor pair."""
+    lcz_path = Path(config["paths"]["lcz_features"])
+    if not lcz_path.exists():
+        raise FileNotFoundError("Run Stage 7b to prepare LCZ features before Stage 8")
+    lcz = pd.read_csv(lcz_path)
+    join_columns = ["location_id", "sensor_id"]
+    group_columns = list(config.get("lcz", {}).get("class_groups", {}))
+    required = {*join_columns, "lat", "lon", *group_columns}
+    missing = sorted(required - set(lcz.columns))
+    if missing:
+        raise ValueError(f"LCZ feature table is missing columns: {missing}")
+    if lcz.duplicated(join_columns).any():
+        raise ValueError("LCZ feature table contains duplicate sensor-location pairs")
+
+    predictor_pairs = predictors[[*join_columns, "lat", "lon"]].drop_duplicates(join_columns)
+    if predictor_pairs.duplicated(join_columns).any():
+        raise ValueError("Predictor table assigns multiple coordinates to one sensor-location pair")
+    checked = predictor_pairs.merge(
+        lcz[[*join_columns, "lat", "lon"]],
+        on=join_columns,
+        how="outer",
+        suffixes=("_predictor", "_lcz"),
+        indicator=True,
+        validate="one_to_one",
+    )
+    if not checked["_merge"].eq("both").all():
+        raise ValueError("LCZ and daily predictor tables do not contain the same sensor pairs")
+    coordinates_match = np.isclose(
+        checked[["lat_predictor", "lon_predictor"]],
+        checked[["lat_lcz", "lon_lcz"]].to_numpy(),
+        atol=1e-9,
+    ).all()
+    if not coordinates_match:
+        raise ValueError("LCZ and daily predictor coordinates do not match")
+
+    lcz_columns = [column for column in lcz if column.startswith("lcz_")]
+    return predictors.merge(
+        lcz[[*join_columns, *lcz_columns]],
+        on=join_columns,
+        how="left",
+        validate="many_to_one",
+    )
+
+
 def _period_labels(dates: pd.Series, settings: dict[str, Any]) -> pd.Series:
     labels = pd.Series(pd.NA, index=dates.index, dtype="string")
     for period in settings["counterfactual_periods"]:
@@ -80,6 +125,7 @@ def build_model_table(config: dict) -> pd.DataFrame:
     """Join the complete predictor panel to the available daily PM2.5 observations."""
     settings = _model_settings(config)
     predictors = pd.read_csv(config["paths"]["predictors"], low_memory=False)
+    predictors = _attach_lcz_features(config, predictors)
     daily = pd.read_csv(config["paths"]["daily"], low_memory=False)
     target = settings["target"]
     features = list(settings["predictors"])
@@ -751,6 +797,10 @@ def train_random_forest(config: dict) -> dict[str, Any]:
         raise ValueError(
             "The selected-parameter file predates explicit candidate selection; "
             "rerun Stages 9 and 9b"
+        )
+    if selected.get("predictors") != features:
+        raise ValueError(
+            "The model predictors changed after candidate selection; rerun Stages 9 and 9b"
         )
     tuning_path = Path(config["paths"]["tuning_results"])
     if not tuning_path.exists():

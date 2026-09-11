@@ -120,6 +120,11 @@ def _model_config(path: Path) -> None:
             "weekday",
             "lat",
             "lon",
+            "lcz_compact_built_fraction",
+            "lcz_open_built_fraction",
+            "lcz_other_built_fraction",
+            "lcz_vegetation_fraction",
+            "lcz_bare_water_fraction",
         ],
     }
     path.write_text(yaml.safe_dump(settings, sort_keys=False), encoding="utf-8")
@@ -190,9 +195,33 @@ def _pipeline_config(tmp_path: Path) -> dict:
     predictors, daily = _synthetic_tables(tmp_path)
     model_config = tmp_path / "model.yaml"
     _model_config(model_config)
+    lcz_features = tmp_path / "lcz_sensor_features.csv"
+    pd.DataFrame(
+        {
+            "location_id": [1, 2, 3],
+            "sensor_id": [11, 22, 33],
+            "lat": [42.68, 42.70, 42.72],
+            "lon": [23.30, 23.32, 23.34],
+            "lcz_compact_built_fraction": [0.6, 0.2, 0.1],
+            "lcz_open_built_fraction": [0.2, 0.5, 0.3],
+            "lcz_other_built_fraction": [0.1, 0.1, 0.2],
+            "lcz_vegetation_fraction": [0.1, 0.2, 0.3],
+            "lcz_bare_water_fraction": [0.0, 0.0, 0.1],
+        }
+    ).to_csv(lcz_features, index=False)
     return {
+        "lcz": {
+            "class_groups": {
+                "lcz_compact_built_fraction": [1, 2, 3],
+                "lcz_open_built_fraction": [4, 5, 6],
+                "lcz_other_built_fraction": [7, 8, 9, 10],
+                "lcz_vegetation_fraction": [11, 12, 13, 14],
+                "lcz_bare_water_fraction": [15, 16, 17],
+            }
+        },
         "paths": {
             "predictors": predictors,
+            "lcz_features": lcz_features,
             "daily": daily,
             "model_config": model_config,
             "model_table": tmp_path / "model_table.csv",
@@ -237,6 +266,10 @@ def test_random_forest_workflow_uses_blocked_pre_lez_data(tmp_path, monkeypatch)
     assert not model_table.duplicated(["location_id", "sensor_id", "date"]).any()
     assert model_table["pm2_5"].isna().sum() == 1
     assert not bool(model_table.loc[0, "eligible_for_training"])
+    assert model_table["lcz_compact_built_fraction"].notna().all()
+    assert model_table.groupby(["location_id", "sensor_id"])[
+        "lcz_compact_built_fraction"
+    ].nunique().eq(1).all()
 
     validation = validate_random_forest(config)
     assert validation["validation_folds"] == 2
@@ -290,6 +323,19 @@ def test_random_forest_workflow_uses_blocked_pre_lez_data(tmp_path, monkeypatch)
     assert selected["candidate_rank"] == 1
     assert selected["selection_reason"] == "Synthetic-test selection"
     assert all(fold["name"] != "autumn_2021" for fold in selected["folds"])
+
+    settings = yaml.safe_load(config["paths"]["model_config"].read_text(encoding="utf-8"))
+    original_predictors = list(settings["predictors"])
+    settings["predictors"] = original_predictors[:-1]
+    config["paths"]["model_config"].write_text(
+        yaml.safe_dump(settings, sort_keys=False), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="predictors changed after candidate selection"):
+        train_random_forest(config)
+    settings["predictors"] = original_predictors
+    config["paths"]["model_config"].write_text(
+        yaml.safe_dump(settings, sort_keys=False), encoding="utf-8"
+    )
 
     repeated_validation = validate_random_forest(config)
     assert repeated_validation["search_id"] != selected["search_id"]

@@ -16,6 +16,7 @@ def main() -> None:
     stable_pairs = table[["location_id", "sensor_id"]].drop_duplicates().shape[0]
     print(f"Model-table rows: {len(table)}")
     print(f"Stable sensor-location pairs: {stable_pairs}")
+    print(f"Grouped LCZ predictors: {len(config['lcz']['class_groups'])}")
     print(f"QC-valid PM2.5 rows: {table['pm2_5'].notna().sum()}")
     print(f"Eligible pre-LEZ training rows: {table['eligible_for_training'].sum()}")
     print(f"Model table: {config['paths']['model_table']}")

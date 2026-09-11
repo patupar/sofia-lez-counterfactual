@@ -10,6 +10,7 @@ from .completeness import calculate_completeness, select_stable_panel
 from .config import load_config
 from .daily import aggregate_daily
 from .downloader import download_archive
+from .lcz import prepare_lcz_features
 from .manifest import build_manifest
 from .meteorology import download_era5, prepare_predictors
 from .modeling import (
@@ -89,6 +90,16 @@ def _predictors(config: dict) -> dict:
     }
 
 
+def _lcz_features(config: dict) -> dict:
+    table = prepare_lcz_features(config)
+    return {
+        "stable_pairs": len(table),
+        "buffer_radius_m": config["lcz"]["buffer_radius_m"],
+        "grouped_predictors": len(config["lcz"]["class_groups"]),
+        "output": str(config["paths"]["lcz_features"]),
+    }
+
+
 def _model_table(config: dict) -> dict:
     table = build_model_table(config)
     return {
@@ -132,6 +143,7 @@ COMMANDS: dict[str, Callable[[dict], dict]] = {
     "select-panel": _panel,
     "download-era5": _download_era5,
     "prepare-predictors": _predictors,
+    "prepare-lcz": _lcz_features,
     "build-model-table": _model_table,
     "validate-random-forest": _validate_model,
     "validate-gradient-boosting": _validate_gradient_boosting,
@@ -149,6 +161,7 @@ DATA_COMMANDS = [
     "select-panel",
     "download-era5",
     "prepare-predictors",
+    "prepare-lcz",
 ]
 MODEL_COMMANDS = [
     "build-model-table",
@@ -175,6 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
                 "aggregate-daily": "aggregate QC-passing hours to local sensor-days",
                 "download-era5": "download hourly ERA5 data for the stable-panel area",
                 "prepare-predictors": "prepare daily meteorological and temporal predictors",
+                "prepare-lcz": "prepare grouped LCZ fractions around stable sensor locations",
                 "build-model-table": "join daily PM2.5 and predictors for the stable panel",
                 "validate-random-forest": "compare RF candidates in blocked time periods",
                 "validate-gradient-boosting": "optionally compare Gradient Boosting candidates",
@@ -212,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--include-modeling",
         action="store_true",
-        help="build the model table and compare RF candidates after Stage 7",
+        help="build the model table and compare RF candidates after Stage 7b",
     )
     return parser
 
@@ -237,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.skip_download:
         steps.remove("download")
     if not args.include_provisional_panel:
-        for step in ("select-panel", "download-era5", "prepare-predictors"):
+        for step in ("select-panel", "download-era5", "prepare-predictors", "prepare-lcz"):
             steps.remove(step)
     elif args.skip_era5_download:
         steps.remove("download-era5")
