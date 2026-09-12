@@ -686,9 +686,9 @@ As such, the final results must therefore be interpreted as exploratory (this ho
 
 No additional tuning or on the fly bias correction will be performed at this stage. Candidate 7 will be carried forward to final training and counterfactual prediction. 
 
-### 5.2 Candidate 7 and feature importance
+### 5.2 Training Candidate 7 and feature importance
 
-**Output `scripts/10_train_random_forest.py`**
+**Output `scripts/10_train_random_forest.py`** [12.09.2026]
 Following formal selection and holdout assessment, candidate 7 was trained on all 71,152 available pre-LEZ observations from 2018 - 2024. This includes the 77 sensor-location pairs and the complete set of 18 predictors. Autumn 2024 was reincorporated, as it was only held pit throughout candidate selection. Otherwise, this period still forms part of the pre-intervention data period. 
 
 ```text
@@ -722,6 +722,45 @@ Further inspection of feature importance provides insight into which predictors 
 The five LCZ fractions together accounted for only 3.12% of the total importance (significance outside compact / open built categories is negligible). This is consistent with the modest improvement observed after adding LCZ during validation. The LCZ variables appear to provide some additional spatial information, but their contribution remained secondary and did not substantially change model performance.
 
 It is important to note that these values describe the relative contribution of each predictor to the model’s predictions. They do not indicate the direction or magnitude of the predictor’s relationship with PM₂.₅ and do not establish causal effects.
+
+### 5.3 Post-LEZ counterfactual predictions
+At this stage the chosen RF is applied to the two post-LEZ heating periods. Total: 20,944 predictions produced; cover all 77 sensor-location pairs across January–March 2025 and October 2025–March 2026. 
+
+**Output scripts/11_predict_counterfactual.py** [12.09.2026]
+```text
+Counterfactual prediction rows: 20944
+Observed comparison rows: 19638
+Periods: post_2025_jan_mar, post_2025_oct_mar
+```
+QC-valid observed PM₂.₅ concentrations are available for 19,638 rows, corresponding to 93.76% of the prediction panel. Of the remaining 1,306 rows, 543 -> no sensor observation /  763 did not pass the daily QC requirements.
+
+The computed predictions represent concentrations expected in the post-LEZ period, assuming that the relationship between meteorological / temporal conditions and PM₂.₅ learned in the pre-LEZ period had continued. Core of the output is the difference calculated between observed ("real") and predicted PM₂.₅. Negative values therefore indicate lower observed concentrations relative to predicted concentrations. 
+
+| Counterfactual period   | Prediction rows | Observed comparison rows |   Coverage | Observed mean (µg/m³) | Predicted mean without LEZ (µg/m³) | Observed − predicted (µg/m³) | Relative difference | Median row-level difference (µg/m³) | Sensor-location pairs below prediction |
+| ----------------------- | --------------: | -----------------------: | ---------: | --------------------: | ---------------------------------: | ---------------------------: | ------------------: | ----------------------------------: | -------------------------------------: |
+| January–March 2025      |           6,930 |                    6,240 |     90.04% |                14.941 |                             16.555 |                       −1.614 |              −9.75% |                              −3.690 |                               43 of 77 |
+| October 2025–March 2026 |          14,014 |                   13,398 |     95.60% |                 8.693 |                             15.430 |                       −6.738 |             −43.66% |                              −6.405 |                               74 of 77 |
+| **Total**               |      **20,944** |               **19,638** | **93.76%** |                     — |                                  — |                            — |                   — |                                   — |                                      — |
+
+When pooling the mean for both post-LEZ periods, January - March 2025 reveals a reduction of -1.614 µg/m³ in PM₂.₅ concentration when calculating the difference between predicted and observed. The heating period October 2025 - March 2026 reveals a reduction of −6.405 µg/m³ in PM₂.₅. Further inspection on a month by month basis provides a clearer picture as to how this discrepancy between both of the heating periods arose. 
+
+| Month         | Prediction rows | Observed comparison rows | Coverage | Observed mean (µg/m³) | Predicted mean without LEZ (µg/m³) | Observed − predicted (µg/m³) | Relative difference |
+| ------------- | --------------: | -----------------------: | -------: | --------------------: | ---------------------------------: | ---------------------------: | ------------------: |
+| January 2025  |           2,387 |                    2,226 |   93.26% |                22.240 |                             22.644 |                       −0.404 |              −1.79% |
+| February 2025 |           2,156 |                    2,091 |   96.99% |                13.995 |                             13.759 |                       +0.236 |              +1.72% |
+| March 2025    |           2,387 |                    1,923 |   80.56% |                 7.520 |                             12.547 |                       −5.027 |             −40.06% |
+| October 2025  |           2,387 |                    2,237 |   93.72% |                 6.428 |                             10.799 |                       −4.371 |             −40.47% |
+| November 2025 |           2,310 |                    2,213 |   95.80% |                 7.728 |                             17.705 |                       −9.977 |             −56.35% |
+| December 2025 |           2,387 |                    2,309 |   96.73% |                13.104 |                             23.061 |                       −9.958 |             −43.18% |
+| January 2026  |           2,387 |                    2,290 |   95.94% |                 9.025 |                             15.276 |                       −6.251 |             −40.92% |
+| February 2026 |           2,156 |                    2,090 |   96.94% |                 8.131 |                             13.281 |                       −5.151 |             −38.78% |
+| March 2026    |           2,387 |                    2,259 |   94.64% |                 7.554 |                             12.132 |                       −4.578 |             −37.73% |
+
+ 
+
+
+
+
 
 
 
