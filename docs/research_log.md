@@ -678,8 +678,14 @@ RF outperforms the benchmark in October, in contrast with November where it perf
 Compared with the complete October–March training dataset, 
 1. the autumn 2024 holdout was more humid, less windy and characterised by higher surface pressure and a lower boundary-layer height, with 
 2. these differences may have arisen due to the exclusion of January–March from the holdout rather than unusual conditions during autumn 2024. 
+Nevertheless no substantiated claims can be made in this regard. This would require a comparison restricted to October-December training observations across all heating seasons.
 
-Nevertheless no substantiated claims can be made in this regard. This would require a comparison restricted to October-December training observations across all heating seasons. 
+The holdout results doe however, reduce the outlook for the later stages of this work. The results currently suggest that the counterfactual baseline is systematically inflated, therefore the difference between observed and counterfactual PM₂.₅ may overstate the apparent post-intervention reduction -> kept in mind for later interpretation of the results. 
+
+As such, the final results must therefore be interpreted as exploratory (this however remains in-line with the initial expectations of this work). The magnitude of any estimated post-LEZ reduction should be considered in relation to the model's observed existing positive bias of ≈ 6 µg/m³ and examined for consistency across months and sensor locations. 
+
+No additional tuning or on the fly bias correction will be performed at this stage. Candidate 7 will be carried forward to final training and counterfactual prediction 
+
 
 
 
