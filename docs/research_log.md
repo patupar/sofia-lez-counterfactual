@@ -679,7 +679,7 @@ Compared with the complete October–March training dataset,
 1. the autumn 2024 holdout was more humid, less windy and characterised by higher surface pressure and a lower boundary-layer height, with 
 2. these differences may have arisen due to the exclusion of January–March from the holdout rather than unusual conditions during autumn 2024. 
 
-
+Nevertheless no substantiated claims can be made in this regard. This would require a comparison restricted to October-December training observations across all heating seasons. 
 
 
 
