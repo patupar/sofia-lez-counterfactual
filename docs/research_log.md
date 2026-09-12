@@ -622,6 +622,64 @@ Including LCZ has broadly retained model performance and produced modest improve
 
 Further experiments and alterations are not possible within the remaining project timeframe. Future iterations are advised to test meteorological data with increased spatial resolution, and explore using more direct emission-related predictors to determine whether these improve the model’s temporal and spatial differentiation. 
 
+Output scripts/09b_select_random_forest.py [run 3: 11.09.2026]
+Candidate 7 is formally selected and evaluated against the historical sensor-mean benchmark. 
+
+Stage 9b combined the predictions from all three validation folds into 37,418 out-of-fold predictions. The resulting pooled metrics differ slightly from the mean-fold metrics reported in Stage 9 because they are calculated across all validation observations rather than averaged across three separate folds.
+
+| Metric                  | Random Forest | Sensor-mean benchmark | Difference |
+| ----------------------- | ------------: | --------------------: | ---------: |
+| Validation MAE (µg/m³)  |         8.134 |                 9.233 |     −1.099 |
+| Validation RMSE (µg/m³) |        10.501 |                11.741 |     −1.240 |
+| Validation R²           |        −0.008 |                −0.260 |     +0.252 |
+| Mean error (µg/m³)      |        +5.942 |                +5.376 |     +0.566 |
+
+Candiate 7 RF model reduced MAE by 1.099 µg/m³ and RMSE by 1.240 µg/m³ compared with the sensor-mean benchmark. It therefore produced smaller typical errors and fewer large errors across the combined validation observations. The pooled R² also moved considerably closer to zero, although it remained slightly negative.
+
+Candiate 7 RF model performed better than the benchmark according to MAE, RMSE and R² in all three validation folds.
+
+| Validation period | RF MAE | Benchmark MAE | RF RMSE | Benchmark RMSE |  RF R² | Benchmark R² |
+| ----------------- | -----: | ------------: | ------: | -------------: | -----: | -----------: |
+| 2021–2022         |  8.365 |         9.360 |  10.919 |         11.664 | −0.329 |       −0.517 |
+| 2022–2023         |  8.557 |         9.678 |  11.151 |         12.722 |  0.163 |       −0.089 |
+| 2023–2024         |  7.478 |         8.663 |   9.332 |         10.776 |  0.007 |       −0.324 |
+
+This implies that the chosen RF does provide predictive value beyond assigning each sensor its historical mean. However, as noted at an earlier stage, performance remains uneven between heating seasons. Furthermore, performance is not spatially uniform. The model achieves a lower MAE than the benchmark at only 44 of the 77 sensor-location pairs. As such, this overall improvement therefore does not apply consistently across the complete sensor panel. A further limitation to note is the produced prediction bias. + 5.942 µg/m³ indicates that the model systematically inflates concentrations during validation. Although its absolute errors were lower than those of the benchmark, its average overprediction was slightly larger.
+
+The selected model was subsequently evaluated on the October–December 2024 holdout period. As this period had already been inspected during the first model run, it is treated as a recent robustness check rather than a test dataset in the conventional sense.
+
+
+| Metric               | Random Forest | Sensor-mean benchmark | Difference |
+| -------------------- | ------------: | --------------------: | ---------: |
+| Holdout MAE (µg/m³)  |         7.939 |                 7.389 |     +0.550 |
+| Holdout RMSE (µg/m³) |         9.744 |                 9.163 |     +0.581 |
+| Holdout R²           |        −0.417 |                −0.253 |     −0.164 |
+| Mean error (µg/m³)   |        +6.677 |                +4.693 |     +1.984 |
+
+In contrast to the blocked-validation results, the Random Forest performed worse than the sensor-mean benchmark during the holdout period. It produced higher MAE and RMSE, a more negative R² and a larger positive mean error. Only 32 of the 77 sensor-location pairs achieved a lower Random Forest MAE than the benchmark.
+
+Interestingly, monthly inspection shows that the result was not consistent across the holdout period.
+
+| Month         | Observed mean (µg/m³) | RF predicted mean (µg/m³) | RF MAE | Benchmark MAE |
+| ------------- | --------------------: | ------------------------: | -----: | ------------: |
+| October 2024  |                 7.529 |                    12.389 |  6.102 |         7.991 |
+| November 2024 |                10.608 |                    18.972 |  9.163 |         6.323 |
+| December 2024 |                11.624 |                    18.492 |  8.615 |         7.833 |
+
+RF outperforms the benchmark in October, in contrast with November where it performs considerably worse. December shows a mixed result, with a higher MAE but a slightly lower RMSE. The model inflates mean PM₂.₅ in all three months, with the largest difference occurring in November. The fact that autumn 2024 is not consistent with the validation folds could be attributed, at least to two related conditions. 
+
+  | Predictor             | Training mean | Autumn 2024 mean |              Difference | Standardised difference |
+| --------------------- | ------------: | ---------------: | ----------------------: | ----------------------: |
+| Relative humidity     |        77.04% |           80.40% | +3.36 percentage points |                  +0.286 |
+| Wind speed            |      1.96 m/s |         1.74 m/s |               −0.22 m/s |                  −0.322 |
+| Surface pressure      |    918.36 hPa |       921.85 hPa |               +3.49 hPa |                  +0.447 |
+| Boundary-layer height |      347.97 m |         264.94 m |                −83.03 m |                  −0.400 |
+
+Compared with the complete October–March training dataset, 
+1. the autumn 2024 holdout was more humid, less windy and characterised by higher surface pressure and a lower boundary-layer height, with 
+2. these differences may have arisen due to the exclusion of January–March from the holdout rather than unusual conditions during autumn 2024. 
+
+
 
 
 
