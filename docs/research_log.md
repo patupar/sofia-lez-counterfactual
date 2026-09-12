@@ -773,13 +773,17 @@ When inspecting the second heating period, October 2025 - March 2026, a larger a
 
 Further inspection of the second heating period identifies four observed means below 1 µg/m³ (rather implausible) and thirteen below 5 µg/m³. When excluding the latter, the mean difference is reduced from −6.738 to −5.536 µg/m³ -> implies that overall negative difference is not entirely attributable to lowest reading sensor. However, from available data it is not possible to establish sensor failure and would be incorrect to do so as they are retained after QC. Excluding sensors only on this basis could remove potentially genuine changes. As such, the complete panel is retained.  
 
-## 6. Counterfactual assessment
+## 6. Counterfactual summary
 ```text
 Counterfactual periods: 2
 Prediction rows: 20944
 Observed comparison rows: 19638
 ```
+Counterfactual predictions are summarised by period, date and sensor-location pair. Resulting tables provide data input for temporal and spatial figures later. 
 
+Inspection of daily summary corroborates the discussed consistency of the second heating period. Observed panel means are below the counterfactual on 172 o 182 days during October 2025 - March 2026, compared with 61 of 84 days with valid comparisons during January-March 2025 period. Same concerns relating to shared model bias still applies. 
+
+The daily summaries clarify the lower coverage discussed for March 2025 in Section 5.3 and the archive gaps discussed in Section 2.3. No QC-valid comparisons were available across the panel during 14–18 March 2025. These five days account for approximately 83% of March’s missing comparison rows. The download ledger confirms HTTP 404 responses for all requested sensors on 16–17 March, while partial observations on the surrounding dates did not meet daily QC requirements. 
 
 
 
