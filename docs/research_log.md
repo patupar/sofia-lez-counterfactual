@@ -425,7 +425,7 @@ A sensor-specific historical mean will provide a simple benchmark. After validat
 model will be fitted to all accepted pre-LEZ heating-month observations, including autumn 2024. Post-LEZ PM₂.₅ 
 observations will not be used for tuning or fitting and remain reserved for comparison against the no-LEZ predictions.
 
-### 5.1 Model table 
+### 5.1 Model table and initial validation
 
 **Output `scripts/08_build_model_table.py`** [09.09.2026]
 
@@ -684,8 +684,44 @@ The holdout results doe however, reduce the outlook for the later stages of this
 
 As such, the final results must therefore be interpreted as exploratory (this however remains in-line with the initial expectations of this work). The magnitude of any estimated post-LEZ reduction should be considered in relation to the model's observed existing positive bias of ≈ 6 µg/m³ and examined for consistency across months and sensor locations. 
 
-No additional tuning or on the fly bias correction will be performed at this stage. Candidate 7 will be carried forward to final training and counterfactual prediction 
+No additional tuning or on the fly bias correction will be performed at this stage. Candidate 7 will be carried forward to final training and counterfactual prediction. 
 
+### 5.2 Candidate 7 and feature importance
+
+**Output `scripts/10_train_random_forest.py`**
+Following formal selection and holdout assessment, candidate 7 was trained on all 71,152 available pre-LEZ observations from 2018 - 2024. This includes the 77 sensor-location pairs and the complete set of 18 predictors. Autumn 2024 was reincorporated, as it was only held pit throughout candidate selection. Otherwise, this period still forms part of the pre-intervention data period. 
+
+```text
+Training rows: 71152
+Sensor-location pairs: 77
+Training period: 2018-01-01 to 2024-12-31
+```
+From the this run, metadata and feature importance results were consequently saved.
+
+| Predictor or group          | Raw feature importance | Percentage importance |
+| --------------------------- | ---------------------: | --------------------: |
+| Boundary-layer height       |               0.406849 |                40.68% |
+| Wind speed                  |               0.157802 |                15.78% |
+| Seasonal cosine             |               0.077241 |                 7.72% |
+| Latitude                    |               0.072040 |                 7.20% |
+| Temperature                 |               0.054736 |                 5.47% |
+| Five LCZ fractions combined |               0.031205 |                 3.12% |
+
+Further inspection of feature importance provides insight into which predictors the model relied on when accounting for spatial and temporal variation in PM₂.₅. This reliance was unevenly distributed. Boundary-layer height and wind speed alone accounted for approximately 56.5% of the total importance. The final model therefore relied predominantly on meteorological conditions related to atmospheric mixing and dispersion. This is physically plausible, as a lower boundary layer and weaker wind can allow pollutants to accumulate near the surface.
+
+| LCZ predictor                  | Raw feature importance | Percentage of total feature importance |
+| ------------------------------ | ---------------------: | -------------------------------------: |
+| Compact built fraction         |               0.011655 |                                  1.17% |
+| Open built fraction            |               0.009990 |                                  1.00% |
+| Vegetation fraction            |               0.006758 |                                  0.68% |
+| Other built fraction           |               0.002790 |                                  0.28% |
+| Bare land/water fraction       |               0.000012 |                                 0.001% |
+| All LCZ fractions combined     |               0.031205 |                         3.12% |
+
+
+The five LCZ fractions together accounted for only 3.12% of the total importance (significance outside compact / open built categories is negligible). This is consistent with the modest improvement observed after adding LCZ during validation. The LCZ variables appear to provide some additional spatial information, but their contribution remained secondary and did not substantially change model performance.
+
+It is important to note that these values describe the relative contribution of each predictor to the model’s predictions. They do not indicate the direction or magnitude of the predictor’s relationship with PM₂.₅ and do not establish causal effects.
 
 
 
