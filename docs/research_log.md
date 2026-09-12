@@ -756,7 +756,7 @@ When pooling the mean for both post-LEZ periods separately, the January - March 
 | February 2026 |           2,156 |                    2,090 |   96.94% |                 8.131 |                             13.281 |                       −5.151 |             −38.78% |
 | March 2026    |           2,387 |                    2,259 |   94.64% |                 7.554 |                             12.132 |                       −4.578 |             −37.73% |
 
-Observed and predicted concentrations show no substantial difference in January 2025, while observed concentrations in February were slightly higher than predicted. The negative difference across the first post-LEZ period is therefore primarily attributable to March 2025. Notably, this month also has the lowest observational coverage, which fell from 96.99% in February to 80.56% in March, a decrease of 16.9% relative to February.
+Observed and predicted concentrations show no substantial difference in January 2025, while observed concentrations in February were slightly higher than predicted. The negative difference across the first post-LEZ period is therefore primarily attributable to March 2025. Notably, this month also has the lowest observational coverage, which fell from 96.99% in February to 80.56% in March, a decrease of 16.9% relative to February (discussed in section 2.3).
 
 This development can be considered from two perspectives. First, the missing observed measurements may have affected the March mean and the resulting observed–predicted difference. Between February and March, the observed mean fell by approximately 46.3%, while the counterfactual mean fell by only 8.8%. However, the available data cannot establish whether the lower coverage caused or increased this difference.
 
@@ -773,6 +773,12 @@ When inspecting the second heating period, October 2025 - March 2026, a larger a
 
 Further inspection of the second heating period identifies four observed means below 1 µg/m³ (rather implausible) and thirteen below 5 µg/m³. When excluding the latter, the mean difference is reduced from −6.738 to −5.536 µg/m³ -> implies that overall negative difference is not entirely attributable to lowest reading sensor. However, from available data it is not possible to establish sensor failure and would be incorrect to do so as they are retained after QC. Excluding sensors only on this basis could remove potentially genuine changes. As such, the complete panel is retained.  
 
+## 6. Counterfactual assessment
+```text
+Counterfactual periods: 2
+Prediction rows: 20944
+Observed comparison rows: 19638
+```
 
 
 
