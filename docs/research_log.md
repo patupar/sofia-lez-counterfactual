@@ -732,7 +732,7 @@ Counterfactual prediction rows: 20944
 Observed comparison rows: 19638
 Periods: post_2025_jan_mar, post_2025_oct_mar
 ```
-QC-valid observed PM₂.₅ concentrations are available for 19,638 rows, corresponding to 93.76% of the prediction panel. Of the remaining 1,306 rows, 543 -> no sensor observation /  763 did not pass the daily QC requirements.
+QC-valid observed PM₂.₅ concentrations are available for 19,638 rows, corresponding to 93.76% of the prediction panel. Of the remaining 1,306 rows did not pass daily QC checks, 543 -> no sensor observation.
 
 The computed predictions represent concentrations expected in the post-LEZ period, assuming that the relationship between meteorological / temporal conditions and PM₂.₅ learned in the pre-LEZ period had continued. Core of the output is the difference calculated between observed ("real") and predicted PM₂.₅. Negative values therefore indicate lower observed concentrations relative to predicted concentrations. 
 
@@ -742,7 +742,7 @@ The computed predictions represent concentrations expected in the post-LEZ perio
 | October 2025–March 2026 |          14,014 |                   13,398 |     95.60% |                 8.693 |                             15.430 |                       −6.738 |             −43.66% |                              −6.405 |                               74 of 77 |
 | **Total**               |      **20,944** |               **19,638** | **93.76%** |                     — |                                  — |                            — |                   — |                                   — |                                      — |
 
-When pooling the mean for both post-LEZ periods, January - March 2025 reveals a reduction of -1.614 µg/m³ in PM₂.₅ concentration when calculating the difference between predicted and observed. The heating period October 2025 - March 2026 reveals a reduction of −6.405 µg/m³ in PM₂.₅. Further inspection on a month by month basis provides a clearer picture as to how this discrepancy between both of the heating periods arose. 
+When pooling the mean for both post-LEZ periods separately, the January - March 2025 heating period reveals a reduction of -1.614 µg/m³ in PM₂.₅ concentration when calculating the difference between predicted and observed. The heating period October 2025 - March 2026 reveals a reduction of −6.738 µg/m³ in PM₂.₅. Relative difference is calculated as (observed - predicted) / predicted * 100. Further inspection on a month by month basis provides a clearer picture as to how this discrepancy between both of the heating periods arose. 
 
 | Month         | Prediction rows | Observed comparison rows | Coverage | Observed mean (µg/m³) | Predicted mean without LEZ (µg/m³) | Observed − predicted (µg/m³) | Relative difference |
 | ------------- | --------------: | -----------------------: | -------: | --------------------: | ---------------------------------: | ---------------------------: | ------------------: |
@@ -756,9 +756,22 @@ When pooling the mean for both post-LEZ periods, January - March 2025 reveals a 
 | February 2026 |           2,156 |                    2,090 |   96.94% |                 8.131 |                             13.281 |                       −5.151 |             −38.78% |
 | March 2026    |           2,387 |                    2,259 |   94.64% |                 7.554 |                             12.132 |                       −4.578 |             −37.73% |
 
- 
+Observed and predicted concentrations show no substantial difference in January 2025, while observed concentrations in February were slightly higher than predicted. The negative difference across the first post-LEZ period is therefore primarily attributable to March 2025. Notably, this month also has the lowest observational coverage, which fell from 96.99% in February to 80.56% in March, a decrease of 16.9% relative to February.
 
+This development can be considered from two perspectives. First, the missing observed measurements may have affected the March mean and the resulting observed–predicted difference. Between February and March, the observed mean fell by approximately 46.3%, while the counterfactual mean fell by only 8.8%. However, the available data cannot establish whether the lower coverage caused or increased this difference.
 
+Second, the March 2025 observed mean of 7.520 µg/m³ is not unusually low compared with the subsequent post-LEZ months. It falls within the range of 6.428–13.104 µg/m³, lies only 0.409 µg/m³ below their median of 7.930 µg/m³ and is nearly identical to the March 2026 mean of 7.554 µg/m³. The decrease could therefore also be considered as a delayed intervention effect. However, this is not conclusive, and the change could also reflect seasonal change, the incomplete observational coverage, not modelled temporal change or prediction error.  The available data cannot distinguish between these explanations.
+
+When inspecting the second heating period, October 2025 - March 2026, a larger and more consistent difference is evident. Observed concentrations remained below the counterfactual in all six months, with the largest differences occurring in November and December. Furthermore, lower observed means at 74 of 77 sensor-locations pairs show that this pattern is widespread across the panel. These results should be treated with caution however, the shared model bias described earlier in validation could  produce this common direction across locations -> consistency therefore does not establish the LEZ effect either. Indeed, the tendency of model to inflate concentration as established during validation are relevant. Mean overproduction was 5.942 µg/m³ during pooled validation and 6.677 µg/m³ during the autumn 2024 robustness check. The second-period difference of −6.738 µg/m³ is similar in magnitude. Consequently, part of the apparent reduction could reflect continued overprediction rather than the intervention itself.
+
+| Included sensor-location pairs              | Comparison rows | Observed mean (µg/m³) | Predicted mean without LEZ (µg/m³) | Observed − predicted (µg/m³) | Relative difference |
+| ------------------------------------------- | --------------: | --------------------: | ---------------------------------: | ---------------------------: | ------------------: |
+| All 77 pairs                                |          13,398 |                 8.693 |                             15.430 |                       −6.738 |             −43.66% |
+| 73 pairs with mean observed PM₂.₅ ≥ 1 µg/m³ |          12,681 |                 9.156 |                             15.413 |                       −6.257 |             −40.59% |
+| 71 pairs with mean observed PM₂.₅ ≥ 2 µg/m³ |          12,324 |                 9.379 |                             15.465 |                       −6.086 |             −39.35% |
+| 64 pairs with mean observed PM₂.₅ ≥ 5 µg/m³ |          11,124 |                 9.995 |                             15.531 |                       −5.536 |             −35.64% |
+
+Further inspection of the second heating period identifies four observed means below 1 µg/m³ (rather implausible) and thirteen below 5 µg/m³. When excluding the latter, the mean difference is reduced from −6.738 to −5.536 µg/m³ -> implies that overall negative difference is not entirely attributable to lowest reading sensor. However, from available data it is not possible to establish sensor failure and would be incorrect to do so as they are retained after QC. Excluding sensors only on this basis could remove potentially genuine changes. As such, the complete panel is retained.  
 
 
 
